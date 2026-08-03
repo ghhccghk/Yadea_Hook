@@ -3,6 +3,7 @@ package com.ghhccghk.yadeahook
 import io.github.lingqiqi5211.ezhooktool.core.findClassIf
 import io.github.lingqiqi5211.ezhooktool.core.findMethod
 import io.github.lingqiqi5211.ezhooktool.core.loadClassFirst
+import io.github.lingqiqi5211.ezhooktool.core.loadClassFirstOrNull
 import io.github.lingqiqi5211.ezhooktool.xposed.dsl.createHook
 
 
@@ -40,7 +41,7 @@ object VehicleServiceHook {
         // 查找 VehicleService 主类
         vehicleServiceClass = findClassIf {
             cacheKey("vehicle-service")
-            packageStartsWith("com.yadea.smartmoto")
+            packageStartsWith("com.yadea.smartmoto.vehicle.service")
             simpleNameContains("VehicleService")
             hasMethod {
                 nameContains("onControlCommand")
@@ -50,17 +51,17 @@ object VehicleServiceHook {
         // 查找 Companion 类 (静态方法持有者)
         companionClass = findClassIf {
             cacheKey("vehicle-service-companion")
-            packageStartsWith("com.yadea.smartmoto")
+            packageStartsWith("com.yadea.smartmoto.vehicle.service")
             simpleName("a")
-            loadClassFirst("VehicleService")
+            loadClassFirstOrNull("VehicleService")
         }
 
         // 查找 BLE 连接回调类
         bleCallbackClass = findClassIf {
             cacheKey("vehicle-ble-callback")
-            packageStartsWith("com.yadea.smartmoto")
+            packageStartsWith("com.yadea.smartmoto.vehicle.service")
             simpleName("b")
-            loadClassFirst("VehicleService")
+            loadClassFirstOrNull("VehicleService")
             hasMethod {
                 name("onConnectStateChange")
                 paramCount(3)
