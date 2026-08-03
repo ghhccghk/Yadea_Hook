@@ -1,5 +1,6 @@
 package com.ghhccghk.yadeahook
 
+import android.content.Context
 import android.os.Build
 import androidx.annotation.RequiresApi
 import io.github.libxposed.api.XposedModule
@@ -8,7 +9,12 @@ import io.github.libxposed.api.XposedModuleInterface.HotReloadingParam
 import io.github.libxposed.api.XposedModuleInterface.ModuleLoadedParam
 import io.github.libxposed.api.XposedModuleInterface.PackageLoadedParam
 import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
+import io.github.lingqiqi5211.ezhooktool.core.EzReflect
+import io.github.lingqiqi5211.ezhooktool.core.findMethod
+import io.github.lingqiqi5211.ezhooktool.core.loadClassOrNull
 import io.github.lingqiqi5211.ezhooktool.xposed.EzXposed
+import io.github.lingqiqi5211.ezhooktool.xposed.EzXposed.appContext
+import io.github.lingqiqi5211.ezhooktool.xposed.dsl.createHook
 
 //雅迪智行 包名
 private const val TargetApp = "com.yadea.smartmoto"
@@ -40,7 +46,20 @@ class MainHook : XposedModule() {
     }
 
     private fun initHooks() {
-        // 注册 VehicleService 相关的 hooks
-        VehicleServiceHook.initHooks()
+        // Hook 360加固壳的 attachBaseContext，在解密后初始化 hooks
+        loadClassOrNull("com.stub.StubApp")?.let { stubClass ->
+            stubClass.findMethod {
+                name("attachBaseContext")
+                paramCount(1)
+            }.createHook {
+                after { param ->
+                    val context = param.args[0] as Context
+                    VehicleServiceHook.initHooks(context)
+                }
+            }
+        } ?: run {
+            // 没有加固壳，直接初始化
+            VehicleServiceHook.initHooks(context = appContext)
+        }
     }
 }

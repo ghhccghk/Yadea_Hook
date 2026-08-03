@@ -1,5 +1,7 @@
 package com.ghhccghk.yadeahook
 
+import android.R.attr.classLoader
+import android.content.Context
 import io.github.lingqiqi5211.ezhooktool.core.findClassIf
 import io.github.lingqiqi5211.ezhooktool.core.findMethod
 import io.github.lingqiqi5211.ezhooktool.core.loadClassFirst
@@ -22,10 +24,14 @@ object VehicleServiceHook {
 
     /**
      * 初始化所有 VehicleService 相关的 hooks
+     * @param context 加固壳解密后的 Context，用于获取 ClassLoader
      */
-    fun initHooks() {
+    fun initHooks(context: Context) {
+        // 使用 context 的 ClassLoader 查找类
+        val classLoader = context.classLoader
+
         // 查找目标类
-        findClasses()
+        findClasses(classLoader)
 
         // 安装 hooks
         hookBleConnectState()
@@ -36,13 +42,13 @@ object VehicleServiceHook {
 
     /**
      * 查找并缓存目标类
+     * @param classLoader 加固壳解密后的 ClassLoader
      */
-    private fun findClasses() {
+    private fun findClasses(classLoader: ClassLoader) {
         // 查找 VehicleService 主类
         vehicleServiceClass = findClassIf {
             cacheKey("vehicle-service")
-            packageStartsWith("com.yadea.smartmoto.vehicle.service")
-            simpleNameContains("VehicleService")
+            loadClassFirstOrNull("com.yadea.smartmoto.vehicle.service.VehicleService", classLoader = classLoader)
             hasMethod {
                 nameContains("onControlCommand")
             }
@@ -51,9 +57,8 @@ object VehicleServiceHook {
         // 查找 Companion 类 (静态方法持有者)
         companionClass = findClassIf {
             cacheKey("vehicle-service-companion")
-            packageStartsWith("com.yadea.smartmoto.vehicle.service")
             simpleName("a")
-            loadClassFirstOrNull("VehicleService")
+            loadClassFirstOrNull("com.yadea.smartmoto.vehicle.service.VehicleService", classLoader = classLoader)
         }
 
         // 查找 BLE 连接回调类
@@ -61,7 +66,7 @@ object VehicleServiceHook {
             cacheKey("vehicle-ble-callback")
             packageStartsWith("com.yadea.smartmoto.vehicle.service")
             simpleName("b")
-            loadClassFirstOrNull("VehicleService")
+            loadClassFirstOrNull("com.yadea.smartmoto.vehicle.service.VehicleService", classLoader = classLoader)
             hasMethod {
                 name("onConnectStateChange")
                 paramCount(3)
