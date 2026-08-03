@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Yadea Hook</string>
+    <string name="xposed_desc">Yadea Hook module</string>
+</resources>
