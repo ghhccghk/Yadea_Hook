@@ -54,12 +54,12 @@ class MainHook : XposedModule() {
             }.createHook {
                 after { param ->
                     val context = param.args[0] as Context
-                    VehicleServiceHook.initHooks(context)
+                    VehicleServiceLoad.initHooks(context)
                 }
             }
         } ?: run {
             // 没有加固壳，直接初始化
-            VehicleServiceHook.initHooks(context = appContext)
+            VehicleServiceLoad.initHooks(context = appContext)
         }
     }
 }
