@@ -32,4 +32,21 @@ abstract class BaseHook {
 
     protected fun Any.callGetter(name: String): Any? =
         javaClass.getMethod(name).invoke(this)
+
+    protected fun Any.dumpFields(): String {
+        val sb = StringBuilder()
+        var clazz: Class<*>? = javaClass
+        while (clazz != null && clazz != Any::class.java) {
+            for (field in clazz.declaredFields) {
+                if (java.lang.reflect.Modifier.isStatic(field.modifiers)) continue
+                try {
+                    field.isAccessible = true
+                    val value = field.get(this)
+                    sb.append("${field.name}=${value}, ")
+                } catch (_: Throwable) { }
+            }
+            clazz = clazz.superclass
+        }
+        return if (sb.isNotEmpty()) sb.substring(0, sb.length - 2) else "{}"
+    }
 }

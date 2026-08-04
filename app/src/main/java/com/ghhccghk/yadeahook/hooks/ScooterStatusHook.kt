@@ -21,25 +21,11 @@ class ScooterStatusHook : BaseHook() {
             }
             method.createHook {
                 after { param ->
+                    val scooterInfo = param.args[0] ?: return@after
                     val ttpInfo = param.args[1] ?: return@after
                     safeHook("滑板车状态-字段读取") {
-                        val gear = ttpInfo.getIntField("drivingMemory")
-                        val cruise = ttpInfo.getIntField("cruiseControl")
-                        val energyRecovery = ttpInfo.getIntField("brakeModePowerRecoverGearStatus")
-                        val lockState = ttpInfo.getIntField("parkingStatus")
-
-                        val gearText = if (gear >= 0) "${gear + 1}档" else "未知"
-                        val cruiseText = when (cruise) {
-                            0 -> "关闭"
-                            1 -> "开启"
-                            else -> "未知"
-                        }
-                        val lockText = when (lockState) {
-                            0 -> "未锁"
-                            1 -> "已锁"
-                            else -> "未知"
-                        }
-                        logHook("Scooter", "档位: $gearText, 巡航: $cruiseText, 锁车: $lockText, 能量回收: $energyRecovery")
+                        logHook("Scooter", "ScooterStatusInfo: ${scooterInfo.dumpFields()}")
+                        logHook("Scooter", "TtpInfo: ${ttpInfo.dumpFields()}")
                     }
                 }
             }

@@ -14,19 +14,27 @@ class VehicleControlHook : BaseHook() {
             return
         }
 
-        safeHook("车辆控制命令") {
-            val controlMethods = companion.findAllMethods {
-                paramCount(1)
-                voidReturnType()
+        safeHook("Companion 方法监控") {
+            val methods = companion.findAllMethods {
+                notStatic()
+                notAbstract()
             }
 
-            for (method in controlMethods) {
+            for (method in methods) {
                 val methodName = method.name
+                if (methodName == "<init>") continue
+
                 method.createHook {
                     before { param ->
-                        val commandBean = param.args[0] ?: return@before
-                        val commandType = commandBean.callGetter("getCommandType") as? String
-                        logHook("Control", "[$methodName] $commandType")
+                        val args = if (param.args.isNullOrEmpty()) {
+                            "无参数"
+                        } else {
+                            param.args.joinToString { arg ->
+                                if (arg == null) "null"
+                                else "${arg.javaClass.simpleName}:${arg}"
+                            }
+                        }
+                        logHook("Control", "[$methodName] $args")
                     }
                 }
             }

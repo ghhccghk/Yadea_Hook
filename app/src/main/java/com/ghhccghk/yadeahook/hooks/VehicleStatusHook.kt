@@ -21,12 +21,13 @@ class VehicleStatusHook : BaseHook() {
             }
             method.createHook {
                 after { param ->
+                    val panelInfo = param.args[0] ?: return@after
+                    val faultInfo = param.args[1] ?: return@after
                     val ttpInfo = param.args[2] ?: return@after
                     safeHook("电动车状态-字段读取") {
-                        val soc = ttpInfo.getFloatField("pBElectricitySoc")
-                        val mileage = ttpInfo.getFloatField("remainingMileage")
-                        val odo = ttpInfo.getFloatField("currentOdoValue")
-                        logHook("Vehicle", "电量: ${soc}%, 续航: ${mileage}km, 总里程: ${odo}km")
+                        logHook("Vehicle", "PanelInfo: ${panelInfo.dumpFields()}")
+                        logHook("Vehicle", "FaultInfo: ${faultInfo.dumpFields()}")
+                        logHook("Vehicle", "TtpInfo: ${ttpInfo.dumpFields()}")
                     }
                 }
             }
