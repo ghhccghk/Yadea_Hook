@@ -14,6 +14,7 @@ object VehicleServiceLoad {
 
     fun initHooks(context: Context) {
         val classLoader = context.classLoader
+        VehicleStatusStore.init(context)
         Log.d(TAG, "开始初始化 VehicleService hooks, classLoader=$classLoader")
 
         val hooks = listOf(

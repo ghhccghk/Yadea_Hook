@@ -3,6 +3,7 @@ package com.ghhccghk.yadeahook.hooks
 import android.content.Context
 import com.ghhccghk.yadeahook.BaseHook
 import com.ghhccghk.yadeahook.VehicleServiceLoad
+import com.ghhccghk.yadeahook.VehicleStatusStore
 import io.github.lingqiqi5211.ezhooktool.core.findMethod
 import io.github.lingqiqi5211.ezhooktool.xposed.dsl.createHook
 
@@ -19,15 +20,23 @@ class VehicleStatusHook : BaseHook() {
                 paramCount(3)
                 voidReturnType()
             }
+            logHook("Vehicle", "匹配方法: ${method.name} params=${method.parameterTypes.map { it.simpleName }}")
             method.createHook {
                 after { param ->
-                    val panelInfo = param.args[0] ?: return@after
-                    val faultInfo = param.args[1] ?: return@after
-                    val ttpInfo = param.args[2] ?: return@after
+                    val ttpObj = param.args[2] ?: return@after
                     safeHook("电动车状态-字段读取") {
-                        logHook("Vehicle", "PanelInfo: ${panelInfo.dumpFields()}")
-                        logHook("Vehicle", "FaultInfo: ${faultInfo.dumpFields()}")
-                        logHook("Vehicle", "TtpInfo: ${ttpInfo.dumpFields()}")
+                        val data = mutableMapOf<String, String>()
+                        ttpObj.getFieldValue("maximumSpeedCurrent")?.let { data["最高车速当前值"] = "$it" }
+                        ttpObj.getFieldValue("busbarVoltage")?.let { data["总电池电压"] = "$it" }
+                        ttpObj.getFieldValue("busbarCurrent")?.let { data["总电池电流"] = "$it" }
+                        ttpObj.getFieldValue("remainingMileage")?.let { data["剩余里程"] = "$it" }
+                        ttpObj.getFieldValue("currentSpeedValue")?.let { data["车速 当前值"] = "$it" }
+                        ttpObj.getFieldValue("currentOdoValue")?.let { data["ODO 当前值"] = "$it" }
+                        ttpObj.getFieldValue("currentTripValue")?.let { data["TRIP 当前值"] = "$it" }
+                        if (data.isNotEmpty()) {
+                            VehicleStatusStore.update(data)
+                            logHook("Vehicle", data.entries.joinToString(", ") { "${it.key}: ${it.value}" })
+                        }
                     }
                 }
             }

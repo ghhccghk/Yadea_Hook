@@ -33,6 +33,23 @@ abstract class BaseHook {
     protected fun Any.callGetter(name: String): Any? =
         javaClass.getMethod(name).invoke(this)
 
+    protected fun Any.getFieldValue(name: String): Any? {
+        return try {
+            val field = javaClass.getDeclaredField(name)
+            field.isAccessible = true
+            field.get(this)
+        } catch (_: Throwable) { null }
+    }
+
+    protected fun parseTtpInfo(text: String, vararg keys: String): Map<String, String> {
+        val result = mutableMapOf<String, String>()
+        for (key in keys) {
+            val regex = Regex("${Regex.escape(key)}[：:]\\s*(.+)")
+            regex.find(text)?.groupValues?.get(1)?.trim()?.let { result[key] = it }
+        }
+        return result
+    }
+
     protected fun Any.dumpFields(): String {
         val sb = StringBuilder()
         var clazz: Class<*>? = javaClass
