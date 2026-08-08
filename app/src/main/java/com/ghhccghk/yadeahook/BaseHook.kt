@@ -20,7 +20,7 @@ abstract class BaseHook {
     }
 
     protected fun logHook(tag: String, message: String) {
-        Log.d(TAG, message)
+        Log.d(TAG, tag + " " +message)
         HookLogger.log(appContext, tag, message)
     }
 
@@ -59,7 +59,7 @@ abstract class BaseHook {
                 try {
                     field.isAccessible = true
                     val value = field.get(this)
-                    sb.append("${field.name}=${value}, ")
+                    sb.append("${field.name}=${value}, \n")
                 } catch (_: Throwable) { }
             }
             clazz = clazz.superclass

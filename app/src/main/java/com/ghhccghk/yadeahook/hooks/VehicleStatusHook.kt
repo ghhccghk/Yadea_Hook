@@ -34,7 +34,7 @@ class VehicleStatusHook : BaseHook() {
                         ttpObj.getFieldValue("currentOdoValue")?.let { data["ODO 当前值"] = "$it" }
                         ttpObj.getFieldValue("currentTripValue")?.let { data["TRIP 当前值"] = "$it" }
                         if (data.isNotEmpty()) {
-                            VehicleStatusStore.update(data)
+//                            VehicleStatusStore.update(data)
                             logHook("Vehicle", data.entries.joinToString(", ") { "${it.key}: ${it.value}" })
                         }
                     }
