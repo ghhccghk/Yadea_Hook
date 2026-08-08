@@ -1,12 +1,16 @@
-# Add project specific R8 rules here.
-# AGP will combine all keep rule files in src/main/keepRules to pass to R8
-#
-# For more details, see
-#   https://d.android.com/r/tools/r8/keep-rules
+# Xposed module entry point — must not be obfuscated
+-keep class com.ghhccghk.yadeahook.MainHook { *; }
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# BroadcastReceivers — registered by name in manifest or code
+-keep class com.ghhccghk.yadeahook.StatusUpdateReceiver { *; }
+-keep class com.ghhccghk.yadeahook.ui.LogReceiver { *; }
+
+# Keep hook base class and subclasses (accessed by reflection)
+-keep class com.ghhccghk.yadeahook.BaseHook { *; }
+-keep class com.ghhccghk.yadeahook.hooks.** { *; }
+
+# Keep VehicleStatusStore (accessed by broadcast action string)
+-keep class com.ghhccghk.yadeahook.VehicleStatusStore { *; }
+
+# Keep VehicleController (accessed by reflection)
+-keep class com.ghhccghk.yadeahook.VehicleController { *; }
