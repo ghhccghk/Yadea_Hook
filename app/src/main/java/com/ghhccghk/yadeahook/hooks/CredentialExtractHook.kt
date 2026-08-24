@@ -3,6 +3,7 @@ package com.ghhccghk.yadeahook.hooks
 import android.content.Context
 import com.ghhccghk.yadeahook.BaseHook
 import com.ghhccghk.yadeahook.VehicleServiceLoad
+import com.ghhccghk.yadeahook.protocol.BleFrameClassifier
 import io.github.lingqiqi5211.ezhooktool.core.findAllMethods
 import io.github.lingqiqi5211.ezhooktool.core.findMethod
 import io.github.lingqiqi5211.ezhooktool.core.loadClassOrNull
@@ -11,8 +12,11 @@ import io.github.lingqiqi5211.ezhooktool.xposed.dsl.createHook
 /**
  * 凭证提取 Hook：BLE Key + Device Token
  *
- * BLE Key：雅迪App连接车辆时使用的蓝牙配对密钥
- * Device Token：App登录后从服务器获取的认证令牌
+ * BLE Key：雅迪App连接车辆时使用的蓝牙认证密钥。
+ *   判定不再按长度猜，而是用 [BleFrameClassifier] 按协议指纹精确识别
+ *   （14B + 尾部固定 4105011055）。
+ * Device Token：App登录后从服务器获取的认证令牌；同时 hook OkHttp
+ *   响应体抓取 getSessionId / token 相关 JSON 字段。
  */
 class CredentialExtractHook : BaseHook() {
 
@@ -25,6 +29,7 @@ class CredentialExtractHook : BaseHook() {
         hookSharedPreferences(classLoader)
         hookBleWrite(classLoader)
         hookOkHttp(classLoader)
+        hookOkHttpResponse(classLoader)
         hookVehicleServiceSend(classLoader)
         scanForCredentialClasses(classLoader)
     }
@@ -233,6 +238,55 @@ class CredentialExtractHook : BaseHook() {
     }
 
     // ============================================================
+    //  3.5 OkHttp ResponseBody 响应体 Hook —— 抓 getSessionId / token JSON
+    // ============================================================
+    private fun hookOkHttpResponse(classLoader: ClassLoader) {
+        safeHook("OkHttp响应体") {
+            try {
+                val bodyClass = loadClassOrNull("okhttp3.ResponseBody", classLoader)
+                    ?: run { logHook("Cred", "okhttp3.ResponseBody 未找到"); return@safeHook }
+                val stringMethod = bodyClass.getMethod("string")
+                stringMethod.createHook {
+                    after { param ->
+                        val body = param.result as? String ?: return@after
+                        if (body.length > 8192) return@after
+                        parseServerJson(body)
+                    }
+                }
+                logHook("Cred", "ResponseBody.string() hook 已安装")
+            } catch (e: Throwable) {
+                logHook("Cred", "ResponseBody hook 失败: ${e.message}")
+            }
+        }
+    }
+
+    /** 解析服务器 JSON 响应中的 sessionId / key / token */
+    private fun parseServerJson(body: String) {
+        val text = body.trim()
+        if (!text.startsWith("{") && !text.startsWith("[")) return
+        val fields = listOf(
+            "sessionId", "session_id", "sessionID",
+            "bleKey", "ble_key", "bleKeyPair", "keyPair",
+            "accessToken", "access_token", "token",
+            "dataKey", "deviceKey", "secret", "sign"
+        )
+        for (field in fields) {
+            val pattern = Regex("\"$field\"\\s*:\\s*\"([^\"]+)\"")
+            val m = pattern.find(text) ?: continue
+            val value = m.groupValues[1]
+            if (value.isBlank() || value.length < 6) continue
+            logHook("Cred-JSON", "$field = $value")
+            if (value.length == 28 && value.matches(Regex("[0-9a-fA-F]+"))) {
+                if (BleFrameClassifier.classify(value) == BleFrameClassifier.Type.KEY) {
+                    logHook("Cred!!!", "===== 服务器下发的 BLE Key =====")
+                    logHook("Cred!!!", "KEY: $value")
+                    if (capturedBleKey == null) capturedBleKey = value
+                }
+            }
+        }
+    }
+
+    // ============================================================
     //  4. VehicleService BLE 发送 Hook — 最关键
     // ============================================================
     private fun hookVehicleServiceSend(classLoader: ClassLoader) {
@@ -401,17 +455,15 @@ class CredentialExtractHook : BaseHook() {
         }
     }
 
-    /** 从十六进制字符串解析可能的 BLE Key */
+    /** 从十六进制字符串解析 BLE Key —— 按协议指纹精确识别（不再按长度猜） */
     private fun parseBleKeyFromHex(hex: String) {
         if (hex.isBlank() || hex.length < 16) return
-        val cleaned = hex.replace(" ", "").replace("-", "")
-        // 支持 28位(14字节), 32位(16字节), 40位(20字节) BLE Key
-        if ((cleaned.length == 28 || cleaned.length == 32 || cleaned.length == 40) && cleaned.matches(Regex("[a-fA-F0-9]+"))) {
-            if (capturedBleKey == null) {
-                capturedBleKey = cleaned
-                val bytes = cleaned.length / 2
-                logHook("Cred!", "BLE Key 候选 (from hex, $bytes bytes): $cleaned")
-            }
+        val cleaned = hex.replace(" ", "").replace("-", "").lowercase()
+        if (cleaned.length != 28) return  // Key 固定 14B = 28 hex
+        if (BleFrameClassifier.classify(cleaned) != BleFrameClassifier.Type.KEY) return
+        if (capturedBleKey == null) {
+            capturedBleKey = cleaned
+            logHook("Cred!", "BLE Key 确认 (from hex, 14 bytes): $cleaned")
         }
     }
 
