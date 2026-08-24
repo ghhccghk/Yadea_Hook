@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.IntentFilter
 import android.util.Log
 import androidx.core.content.ContextCompat
+import com.ghhccghk.yadeahook.hooks.BleAuthCaptureHook
 import com.ghhccghk.yadeahook.hooks.BleConnectStateHook
 import com.ghhccghk.yadeahook.hooks.CredentialExtractHook
 import com.ghhccghk.yadeahook.hooks.ScooterStatusHook
