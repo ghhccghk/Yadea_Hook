@@ -369,8 +369,10 @@ class CredentialExtractHook : BaseHook() {
 
         capturedTokens.add(value)
 
-        // BLE Key 特征：32位Hex
-        val isBleKey = (value.length == 32 && value.matches(Regex("[a-fA-F0-9]+"))) ||
+        // BLE Key 特征：28位Hex(14字节) / 32位Hex(16字节) / 40位Hex(20字节)
+        val isBleKey = (value.length == 28 && value.matches(Regex("[a-fA-F0-9]+"))) ||
+                (value.length == 32 && value.matches(Regex("[a-fA-F0-9]+"))) ||
+                (value.length == 40 && value.matches(Regex("[a-fA-F0-9]+"))) ||
                 (value.length == 24 && value.matches(Regex("[A-Za-z0-9+/]+=?"))) ||
                 value.matches(Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"))
 
@@ -403,10 +405,12 @@ class CredentialExtractHook : BaseHook() {
     private fun parseBleKeyFromHex(hex: String) {
         if (hex.isBlank() || hex.length < 16) return
         val cleaned = hex.replace(" ", "").replace("-", "")
-        if (cleaned.length == 32 && cleaned.matches(Regex("[a-fA-F0-9]+"))) {
+        // 支持 28位(14字节), 32位(16字节), 40位(20字节) BLE Key
+        if ((cleaned.length == 28 || cleaned.length == 32 || cleaned.length == 40) && cleaned.matches(Regex("[a-fA-F0-9]+"))) {
             if (capturedBleKey == null) {
                 capturedBleKey = cleaned
-                logHook("Cred!", "BLE Key 候选 (from hex): $cleaned")
+                val bytes = cleaned.length / 2
+                logHook("Cred!", "BLE Key 候选 (from hex, $bytes bytes): $cleaned")
             }
         }
     }
