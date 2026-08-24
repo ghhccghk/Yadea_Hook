@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
@@ -30,6 +31,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -40,12 +43,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import com.ghhccghk.yadeahook.VehicleControlReceiver
 import com.ghhccghk.yadeahook.provider.HookLogger
+import java.io.File
+import java.io.FileWriter
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -98,14 +105,48 @@ fun LogScreen(modifier: Modifier = Modifier) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("Hook 日志", style = MaterialTheme.typography.titleMedium)
-            Button(
-                onClick = { logs.clear() },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer
-                )
-            ) {
-                Text("清除", fontSize = 13.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                OutlinedButton(
+                    onClick = {
+                        val logsToExport = logs.toList()
+                        if (logsToExport.isEmpty()) {
+                            Toast.makeText(context, "没有日志可导出", Toast.LENGTH_SHORT).show()
+                            return@OutlinedButton
+                        }
+                        try {
+                            val dateStr = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+                            val fileName = "yadea_hook_log_$dateStr.txt"
+                            val file = File(context.getExternalFilesDir(null), fileName)
+                            FileWriter(file).use { writer ->
+                                logsToExport.forEach { entry ->
+                                    val line = "[${timeFormat.format(Date(entry.timestamp))}] ${entry.tag} | ${entry.message}\n"
+                                    writer.write(line)
+                                }
+                            }
+                            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_STREAM, uri)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(Intent.createChooser(shareIntent, "分享 Hook 日志"))
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "导出失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    modifier = Modifier.padding(end = 4.dp)
+                ) {
+                    Text("📤 导出", fontSize = 12.sp)
+                }
+                Button(
+                    onClick = { logs.clear() },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                ) {
+                    Text("清除", fontSize = 13.sp)
+                }
             }
         }
 
