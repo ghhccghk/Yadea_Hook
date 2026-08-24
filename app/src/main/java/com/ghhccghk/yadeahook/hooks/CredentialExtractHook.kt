@@ -10,6 +10,9 @@ import io.github.lingqiqi5211.ezhooktool.xposed.dsl.createHook
 
 /**
  * 凭证提取 Hook：BLE Key + Device Token
+ *
+ * BLE Key：雅迪App连接车辆时使用的蓝牙配对密钥
+ * Device Token：App登录后从服务器获取的认证令牌
  */
 class CredentialExtractHook : BaseHook() {
 
@@ -26,6 +29,9 @@ class CredentialExtractHook : BaseHook() {
         scanForCredentialClasses(classLoader)
     }
 
+    // ============================================================
+    //  1. SharedPreferences Hook — 监控 token / ble_key
+    // ============================================================
     private fun hookSharedPreferences(classLoader: ClassLoader) {
         safeHook("SharedPreferences 读取") {
             val spImplClass = loadClassOrNull("android.app.SharedPreferencesImpl", classLoader)
@@ -36,8 +42,9 @@ class CredentialExtractHook : BaseHook() {
 
             val getStringMethod = spImplClass.findMethod { name("getString"); paramCount(2) }
             getStringMethod.createHook {
-                before { param ->
-                    val key = param.args[0] as? String ?: return@before
+                // 读取值用 after hook，这样能拿到原始返回值
+                after { param ->
+                    val key = param.args[0] as? String ?: return@after
                     val credentialKeys = listOf(
                         "token", "access_token", "refresh_token",
                         "device_token", "deviceId", "device_id",
@@ -47,9 +54,8 @@ class CredentialExtractHook : BaseHook() {
                         "authkey", "secret", "sign_key", "akey"
                     )
                     if (credentialKeys.any { key.contains(it, ignoreCase = true) }) {
-                        val result = param.getResult() as? String ?: return@before
-                        logHook("Cred-SP", "key=$key value=$result")
-                        identifyCredential(key, result)
+                        val result = param.args[1] as? String
+                        logHook("Cred-SP", "key=$key defaultValue=$result")
                     }
                 }
             }
@@ -57,13 +63,11 @@ class CredentialExtractHook : BaseHook() {
             try {
                 val getLongMethod = spImplClass.findMethod { name("getLong"); paramCount(2) }
                 getLongMethod.createHook {
-                    before { param ->
-                        val key = param.args[0] as? String ?: return@before
+                    after { param ->
+                        val key = param.args[0] as? String ?: return@after
                         if (key.contains("token", ignoreCase = true) || key.contains("device", ignoreCase = true)) {
-                            val result = param.getResult() as? Long
-                            if (result != null && result > 0) {
-                                logHook("Cred-SP", "key=$key long=$result")
-                            }
+                            val defaultVal = param.args[1] as? Long
+                            logHook("Cred-SP", "key=$key defaultLong=$defaultVal")
                         }
                     }
                 }
@@ -73,6 +77,9 @@ class CredentialExtractHook : BaseHook() {
         }
     }
 
+    // ============================================================
+    //  2. BLE 写入 Hook — 拦截所有 BLE 写入操作
+    // ============================================================
     private fun hookBleWrite(classLoader: ClassLoader) {
         safeHook("BLE写入操作") {
             val bleCandidates = listOf(
@@ -94,6 +101,8 @@ class CredentialExtractHook : BaseHook() {
                 }
             }
 
+            // Hook android.bluetooth.BluetoothGattCharacteristic.setValue(byte[])
+            // 所有BLE写入最终都会经过这里，是最底层的hook点
             try {
                 val gattCharClass = classLoader.loadClass("android.bluetooth.BluetoothGattCharacteristic")
                 val setValueMethod = gattCharClass.getDeclaredMethod("setValue", ByteArray::class.java)
@@ -111,12 +120,13 @@ class CredentialExtractHook : BaseHook() {
             }
 
             if (bleClass != null) {
-                val writeMethods = bleClass!!.findAllMethods {
-                    notStatic(); voidReturnType()
-                    paramTypes { anyMatch { it == ByteArray::class.java } }
-                }
-                for (method in writeMethods) {
+                val allMethods = bleClass!!.findAllMethods { notStatic(); voidReturnType() }
+                for (method in allMethods) {
                     if (method.name == "<init>") continue
+                    val paramTypes = method.parameterTypes
+                    val hasByteArray = paramTypes.any { it == ByteArray::class.java }
+                    if (!hasByteArray) continue
+
                     method.createHook {
                         before { param ->
                             val hexArgs = param.args.filterIsInstance<ByteArray>()
@@ -126,11 +136,14 @@ class CredentialExtractHook : BaseHook() {
                         }
                     }
                 }
-                logHook("Cred", "BLE服务类方法 Hook 已安装 (${writeMethods.size}个)")
+                logHook("Cred", "BLE服务类方法 Hook 已安装")
             }
         }
     }
 
+    // ============================================================
+    //  3. OkHttp Hook — 拦截 HTTP 请求头中的 Device Token
+    // ============================================================
     private fun hookOkHttp(classLoader: ClassLoader) {
         safeHook("OkHttp拦截层") {
             hookAllInterceptorImpl(classLoader)
@@ -219,6 +232,9 @@ class CredentialExtractHook : BaseHook() {
         } catch (_: Throwable) { }
     }
 
+    // ============================================================
+    //  4. VehicleService BLE 发送 Hook — 最关键
+    // ============================================================
     private fun hookVehicleServiceSend(classLoader: ClassLoader) {
         safeHook("VehicleService BLE发送") {
             val vehicleServiceClass = VehicleServiceLoad.findVehicleService(classLoader)
@@ -260,15 +276,11 @@ class CredentialExtractHook : BaseHook() {
                         param.args.filterIsInstance<ByteArray>().forEach { parseBleKeyFromHex(bytesToHex(it)) }
                     }
                     after { param ->
-                        val result = param.getResult()
-                        if (result != null && result !is Unit) {
-                            val retStr = when (result) {
-                                is ByteArray -> "byte[${result.size}](${bytesToHex(result).take(80)})"
-                                is String -> if (result.length < 200) result else result.take(100)
-                                else -> "Obj:${result.javaClass.simpleName}"
+                        // after hook: 遍历所有字段找凭证
+                        param.args.forEach { arg ->
+                            if (arg is String && arg.length in 16..512 && !arg.contains(" ") && !arg.contains("http")) {
+                                identifyCredential("VehSend-after", arg)
                             }
-                            logHook("VehSend-Ret", "[${method.name}] ret=$retStr")
-                            if (result is String) identifyCredential("VehSend-ret", result)
                         }
                     }
                 }
@@ -277,6 +289,9 @@ class CredentialExtractHook : BaseHook() {
         }
     }
 
+    // ============================================================
+    //  5. 扫描可疑凭证类
+    // ============================================================
     private fun scanForCredentialClasses(classLoader: ClassLoader) {
         safeHook("凭证类扫描") {
             val suspiciousClassNames = listOf(
@@ -326,15 +341,11 @@ class CredentialExtractHook : BaseHook() {
                                 logHook("CredClass", "[$className.${method.name}] args=($args)")
                             }
                             after { param ->
-                                val ret = param.getResult()
-                                if (ret != null && ret !is Unit) {
-                                    val retStr = when (ret) {
-                                        is ByteArray -> "byte[${ret.size}](${bytesToHex(ret).take(60)})"
-                                        is String -> if (ret.length < 200) ret else ret.take(100)
-                                        else -> ret.toString()
+                                // 从当前对象的字段里找凭证
+                                param.args.forEach { arg ->
+                                    if (arg is String && arg.length in 8..512) {
+                                        identifyCredential("$className.${method.name}", arg)
                                     }
-                                    logHook("CredClass", "[$className.${method.name}] ret=$retStr")
-                                    identifyCredential("$className.${method.name}", retStr)
                                 }
                             }
                         }
@@ -344,6 +355,11 @@ class CredentialExtractHook : BaseHook() {
         }
     }
 
+    // ============================================================
+    //  辅助方法
+    // ============================================================
+
+    /** 识别并高亮凭证字符串 */
     private fun identifyCredential(source: String, value: String) {
         if (value.isBlank() || value == "null" || value.length < 8) return
         if (capturedTokens.contains(value)) return
@@ -353,7 +369,7 @@ class CredentialExtractHook : BaseHook() {
 
         capturedTokens.add(value)
 
-        val isBleKey = (value.length == 32 && value.matches(Regex("[a-fA-F0-9]+"))) ||
+        // BLE Key 特征：32位Hex        val isBleKey = (value.length == 32 && value.matches(Regex("[a-fA-F0-9]+"))) ||
                 (value.length == 24 && value.matches(Regex("[A-Za-z0-9+/]+=?"))) ||
                 value.matches(Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"))
 
@@ -382,6 +398,7 @@ class CredentialExtractHook : BaseHook() {
         }
     }
 
+    /** 从十六进制字符串解析可能的 BLE Key */
     private fun parseBleKeyFromHex(hex: String) {
         if (hex.isBlank() || hex.length < 16) return
         val cleaned = hex.replace(" ", "").replace("-", "")
@@ -393,6 +410,7 @@ class CredentialExtractHook : BaseHook() {
         }
     }
 
+    /** ByteArray 转十六进制字符串 */
     private fun bytesToHex(bytes: ByteArray): String {
         return bytes.joinToString("") { "%02x".format(it) }
     }
