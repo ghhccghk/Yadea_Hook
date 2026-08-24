@@ -5,6 +5,7 @@ import android.content.IntentFilter
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.ghhccghk.yadeahook.hooks.BleConnectStateHook
+import com.ghhccghk.yadeahook.hooks.CredentialExtractHook
 import com.ghhccghk.yadeahook.hooks.ScooterStatusHook
 import com.ghhccghk.yadeahook.hooks.VehicleControlHook
 import com.ghhccghk.yadeahook.hooks.VehicleDataReadHook
@@ -37,7 +38,8 @@ object VehicleServiceLoad {
             VehicleStatusHook(),
             ScooterStatusHook(),
             VehicleDataReadHook(),
-            VehicleServiceOnNotifyDataCallBackHook()
+            VehicleServiceOnNotifyDataCallBackHook(),
+            CredentialExtractHook()
         )
 
         hooks.forEach { hook ->
