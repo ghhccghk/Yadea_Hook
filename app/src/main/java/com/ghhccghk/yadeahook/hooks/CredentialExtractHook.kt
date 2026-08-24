@@ -173,11 +173,11 @@ class CredentialExtractHook : BaseHook() {
                     before { param ->
                         val chain = param.args[0]
                         try {
-                            val request = chain.javaClass.getMethod("request").invoke(chain)
-                            val url = request.javaClass.getMethod("url").invoke(request) as? java.net.URL
+                            val request = chain?.javaClass?.getMethod("request")?.invoke(chain)
+                            val url = request?.javaClass?.getMethod("url")?.invoke(request) as? java.net.URL
                             val urlStr = url?.toString() ?: ""
-                            val headers = request.javaClass.getMethod("headers").invoke(request)
-                            val names = headers.javaClass.getMethod("names").invoke(headers) as? Collection<*>
+                            val headers = request?.javaClass?.getMethod("headers")?.invoke(request)
+                            val names = headers?.javaClass?.getMethod("names")?.invoke(headers) as? Collection<*>
 
                             names?.forEach { name ->
                                 val nameStr = name?.toString() ?: return@forEach
@@ -186,8 +186,8 @@ class CredentialExtractHook : BaseHook() {
                                     nameStr == "Authorization" ||
                                     nameStr == "X-Device-Token" ||
                                     nameStr == "device-token") {
-                                    val value = headers.javaClass.getMethod("get", String::class.java)
-                                        .invoke(headers, nameStr) as? String
+                                    val value = headers?.javaClass?.getMethod("get", String::class.java)
+                                        ?.invoke(headers, nameStr) as? String
                                     if (!value.isNullOrBlank()) {
                                         logHook("HTTP-Req", "[$className] $nameStr: $value")
                                         if (capturedDeviceToken == null && value.length > 10) {
@@ -369,7 +369,8 @@ class CredentialExtractHook : BaseHook() {
 
         capturedTokens.add(value)
 
-        // BLE Key 特征：32位Hex        val isBleKey = (value.length == 32 && value.matches(Regex("[a-fA-F0-9]+"))) ||
+        // BLE Key 特征：32位Hex
+        val isBleKey = (value.length == 32 && value.matches(Regex("[a-fA-F0-9]+"))) ||
                 (value.length == 24 && value.matches(Regex("[A-Za-z0-9+/]+=?"))) ||
                 value.matches(Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"))
 
