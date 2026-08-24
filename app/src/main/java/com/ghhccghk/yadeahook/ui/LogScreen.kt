@@ -1,5 +1,6 @@
 package com.ghhccghk.yadeahook.ui
 
+import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -66,12 +67,28 @@ fun LogScreen(modifier: Modifier = Modifier) {
     val logs = LogReceiver.logs
     val listState = rememberLazyListState()
     var ttpExpanded by remember { mutableStateOf(false) }
+    var authRefresh by remember { mutableStateOf(0) }
 
     DisposableEffect(Unit) {
         val receiver = LogReceiver()
         context.registerReceiver(receiver, IntentFilter(HookLogger.ACTION), Context.RECEIVER_EXPORTED)
-        onDispose { context.unregisterReceiver(receiver) }
+        // 监听 BLE 认证序列广播，触发面板刷新
+        val authReceiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                authRefresh++
+            }
+        }
+        context.registerReceiver(authReceiver, IntentFilter(com.ghhccghk.yadeahook.BleAuthStore.ACTION), Context.RECEIVER_EXPORTED)
+        onDispose {
+            context.unregisterReceiver(receiver)
+            context.unregisterReceiver(authReceiver)
+        }
     }
+
+    // 认证面板随广播刷新（读取最新静态值）
+    val authKey = remember(authRefresh) { com.ghhccghk.yadeahook.BleAuthStore.keyHex }
+    val authInit = remember(authRefresh) { com.ghhccghk.yadeahook.BleAuthStore.initHex }
+    val authText = remember(authRefresh) { com.ghhccghk.yadeahook.BleAuthStore.sequenceText() }
 
     LaunchedEffect(logs.size) {
         if (logs.isNotEmpty()) {
@@ -175,6 +192,53 @@ fun LogScreen(modifier: Modifier = Modifier) {
                     OutlinedButton(onClick = { sendControl("SCOOTER_GEAR_3") }) { Text("3档", fontSize = 11.sp) }
                     OutlinedButton(onClick = { sendControl("disconnect") }) { Text("断开", fontSize = 11.sp) }
                     OutlinedButton(onClick = { sendControl("cancel_scan") }) { Text("取消扫描", fontSize = 11.sp) }
+                }
+            }
+        }
+
+        // 认证序列面板（BleAuthStore 最新 KEY/INIT）
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text("BLE 认证序列", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                if (authKey.isEmpty() && authInit.isEmpty()) {
+                    Text("尚未抓到认证帧（需 App 连接车辆后刷新）", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    SelectionContainer(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(top = 4.dp)) {
+                            if (authInit.isNotEmpty()) {
+                                Text("INIT: $authInit", fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                            }
+                            if (authKey.isNotEmpty()) {
+                                Text("★ KEY: $authKey", fontSize = 12.sp, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.primary)
+                            }
+                            if (authText.isNotEmpty()) {
+                                Text("序列:\n$authText", fontSize = 10.sp, fontFamily = FontFamily.Monospace, maxLines = 10, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("YD-KEY", authKey))
+                            Toast.makeText(context, "已复制 KEY", Toast.LENGTH_SHORT).show()
+                        }, enabled = authKey.isNotEmpty()) {
+                            Text("复制 KEY", fontSize = 12.sp)
+                        }
+                        TextButton(onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("YD-SEQ", authText))
+                            Toast.makeText(context, "已复制完整序列", Toast.LENGTH_SHORT).show()
+                        }, enabled = authText.isNotEmpty()) {
+                            Text("复制序列", fontSize = 12.sp)
+                        }
+                    }
                 }
             }
         }

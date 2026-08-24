@@ -39,6 +39,7 @@ object VehicleServiceLoad {
             ScooterStatusHook(),
             VehicleDataReadHook(),
             VehicleServiceOnNotifyDataCallBackHook(),
+            BleAuthCaptureHook(),
             CredentialExtractHook()
         )
 
