@@ -36,7 +36,7 @@ class ScooterStatusHook : BaseHook() {
 //                        ttpObj.getFieldValue("currentTripValue")?.let { data["TRIP 当前值"] = "$it" }
                         if (data.isNotEmpty()) {
                             VehicleStatusStore.update(data)
-//                            logHook("Scooter", data.entries.joinToString(", ") { "${it.key}: ${it.value}" })
+                            logHook("Scooter", data.entries.joinToString(", ") { "${it.key}: ${it.value}" })
                         }
 //                        logHook("TtpInfo", ttpObj.dumpFields())
                     }
