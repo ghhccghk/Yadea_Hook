@@ -1,6 +1,8 @@
 ﻿package com.ghhccghk.yadeahook
 
+import android.annotation.SuppressLint
 import android.content.IntentFilter
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -35,8 +37,18 @@ class MainActivity : ComponentActivity() {
         // 注册速度警报广播接收器
         speedAlertReceiver = SpeedAlertReceiver()
         val filter = IntentFilter(SpeedAlertReceiver.ACTION)
-        registerReceiver(speedAlertReceiver, filter)
-        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(speedAlertReceiver, filter,RECEIVER_EXPORTED)
+        } else {
+            @SuppressLint("UnspecifiedRegisterReceiverFlag")
+            @Suppress("DEPRECATION")
+            applicationContext.registerReceiver(
+                speedAlertReceiver,
+                filter
+            )
+        }
+
+
         setContent {
             YadeaHookTheme {
                 YadeaHookApp()
