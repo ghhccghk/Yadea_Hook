@@ -22,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,8 +48,6 @@ fun CurveEditor(
     maxStrength: Float = 100f,
     showGrid: Boolean = true
 ) {
-    val density = LocalDensity.current
-    
     // 确保至少有两个点
     val points = remember(curvePoints) {
         if (curvePoints.size < 2) {
@@ -102,96 +101,164 @@ fun CurveEditor(
                 .background(surfaceVariant, MaterialTheme.shapes.medium)
                 .padding(16.dp)
         ) {
+            val currentPoints by rememberUpdatedState(points)
+            val currentOnCurvePointsChanged by rememberUpdatedState(onCurvePointsChanged)
+
             Canvas(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(168.dp)
                     .pointerInput(Unit) {
-                        detectTapGestures { offset ->
-                            // 点击选择最近的点
-                            val chartWidth = size.width.toFloat()
-                            val chartHeight = size.height.toFloat()
-                            
-                            var minDist = Float.MAX_VALUE
-                            var closestIndex = -1
-                            
-                            points.forEachIndexed { index, point ->
-                                val x = point.speed / maxSpeed * chartWidth
-                                val y = chartHeight - (point.strength / maxStrength * chartHeight)
-                                val dist = (Offset(x, y) - offset).getDistance()
-                                
-                                if (dist < minDist && dist < 30f) {
-                                    minDist = dist
-                                    closestIndex = index
-                                }
-                            }
-                            
-                            selectedPointIndex = closestIndex
-                        }
-                    }
-                    .pointerInput(Unit) {
-                        detectDragGestures { change, dragAmount ->
-                            change.consume()
-                            
-                            if (selectedPointIndex >= 0 && selectedPointIndex < points.size) {
+                        detectDragGestures(
+                            onDragStart = { offset ->
                                 val chartWidth = size.width.toFloat()
                                 val chartHeight = size.height.toFloat()
-                                
-                                dragOffset += dragAmount
-                                
-                                // 计算新位置
-                                val currentPoint = points[selectedPointIndex]
-                                val newX = (currentPoint.speed / maxSpeed * chartWidth + dragOffset.x)
-                                    .coerceIn(0f, chartWidth)
-                                val newY = (chartHeight - currentPoint.strength / maxStrength * chartHeight + dragOffset.y)
-                                    .coerceIn(0f, chartHeight)
-                                
-                                // 转换回速度和强度
-                                val newSpeed = (newX / chartWidth * maxSpeed).coerceIn(0f, maxSpeed)
-                                val newStrength = ((chartHeight - newY) / chartHeight * maxStrength).coerceIn(0f, maxStrength)
-                                
-                                // 更新点
-                                val newPoints = points.toMutableList()
-                                
-                                // 保持第一个和最后一个点的x坐标固定
-                                if (selectedPointIndex == 0) {
-                                    newPoints[selectedPointIndex] = currentPoint.copy(strength = newStrength)
-                                } else if (selectedPointIndex == points.size - 1) {
-                                    newPoints[selectedPointIndex] = currentPoint.copy(strength = newStrength)
-                                } else {
-                                    // 确保点不会越过相邻点
-                                    val minSpeed = points[selectedPointIndex - 1].speed + 1f
-                                    val maxSpeedLimit = points[selectedPointIndex + 1].speed - 1f
-                                    newPoints[selectedPointIndex] = SpeedStrengthMapper.CurvePoint(
-                                        speed = newSpeed.coerceIn(minSpeed, maxSpeedLimit),
-                                        strength = newStrength
-                                    )
+
+                                var minDist = Float.MAX_VALUE
+                                var closestIndex = -1
+
+                                currentPoints.forEachIndexed { index, point ->
+                                    val x = point.speed / maxSpeed * chartWidth
+                                    val y = chartHeight -
+                                            (point.strength / maxStrength * chartHeight)
+
+                                    val distance = (Offset(x, y) - offset).getDistance()
+
+                                    // 30dp 左右的命中范围
+                                    if (distance < minDist && distance < 40f) {
+                                        minDist = distance
+                                        closestIndex = index
+                                    }
                                 }
-                                
-                                onCurvePointsChanged(newPoints)
+
+                                selectedPointIndex = closestIndex
+                                dragOffset = Offset.Zero
+                            },
+
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+
+                                val index = selectedPointIndex
+
+                                if (index < 0 || index >= currentPoints.size) {
+                                    return@detectDragGestures
+                                }
+
+                                val chartWidth = size.width.toFloat()
+                                val chartHeight = size.height.toFloat()
+
+                                val oldPoints = currentPoints
+                                val currentPoint = oldPoints[index]
+
+                                // 当前点的画布坐标
+                                val currentX =
+                                    currentPoint.speed / maxSpeed * chartWidth
+
+                                val currentY =
+                                    chartHeight -
+                                            currentPoint.strength / maxStrength * chartHeight
+
+                                // 根据本次拖动计算新位置
+                                val newX = (currentX + dragAmount.x)
+                                    .coerceIn(0f, chartWidth)
+
+                                val newY = (currentY + dragAmount.y)
+                                    .coerceIn(0f, chartHeight)
+
+                                // 转换回实际数据
+                                val newSpeed =
+                                    (newX / chartWidth * maxSpeed)
+                                        .coerceIn(0f, maxSpeed)
+
+                                val newStrength =
+                                    ((chartHeight - newY) / chartHeight * maxStrength)
+                                        .coerceIn(0f, maxStrength)
+
+                                val newPoints = oldPoints.toMutableList()
+
+                                when (index) {
+
+                                    // 首点只能上下移动
+                                    0 -> {
+                                        newPoints[index] =
+                                            currentPoint.copy(
+                                                strength = newStrength
+                                            )
+                                    }
+
+                                    // 尾点只能上下移动
+                                    oldPoints.lastIndex -> {
+                                        newPoints[index] =
+                                            currentPoint.copy(
+                                                strength = newStrength
+                                            )
+                                    }
+
+                                    // 中间点可以自由移动
+                                    else -> {
+                                        val minSpeed =
+                                            oldPoints[index - 1].speed + 0.1f
+
+                                        val maxSpeedLimit =
+                                            oldPoints[index + 1].speed - 0.1f
+
+                                        newPoints[index] =
+                                            SpeedStrengthMapper.CurvePoint(
+                                                speed = newSpeed.coerceIn(
+                                                    minSpeed,
+                                                    maxSpeedLimit
+                                                ),
+                                                strength = newStrength
+                                            )
+                                    }
+                                }
+
+                                currentOnCurvePointsChanged(newPoints)
+                            },
+
+                            onDragEnd = {
+                                selectedPointIndex = -1
+                                dragOffset = Offset.Zero
+                            },
+
+                            onDragCancel = {
+                                selectedPointIndex = -1
                                 dragOffset = Offset.Zero
                             }
-                        }
+                        )
                     }
             ) {
                 val chartWidth = size.width
                 val chartHeight = size.height
-                
+
                 // 绘制网格
                 if (showGrid) {
-                    drawGrid(chartWidth, chartHeight, maxSpeed, maxStrength, outlineColor)
+                    drawGrid(
+                        chartWidth,
+                        chartHeight,
+                        maxSpeed,
+                        maxStrength,
+                        outlineColor
+                    )
                 }
-                
+
                 // 绘制曲线
-                drawCurve(points, chartWidth, chartHeight, maxSpeed, maxStrength, primaryColor)
-                
+                drawCurve(
+                    points,
+                    chartWidth,
+                    chartHeight,
+                    maxSpeed,
+                    maxStrength,
+                    primaryColor
+                )
+
                 // 绘制控制点
                 drawControlPoints(
-                    points, 
-                    chartWidth, 
-                    chartHeight, 
-                    maxSpeed, 
-                    maxStrength, 
+                    points,
+                    chartWidth,
+                    chartHeight,
+                    maxSpeed,
+                    maxStrength,
                     primaryColor,
                     selectedPointIndex
                 )

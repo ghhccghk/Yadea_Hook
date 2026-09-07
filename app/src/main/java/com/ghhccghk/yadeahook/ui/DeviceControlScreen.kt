@@ -1,7 +1,10 @@
 ﻿package com.ghhccghk.yadeahook.ui
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,7 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.BluetoothSearching
 import androidx.compose.material.icons.filled.BluetoothConnected
 import androidx.compose.material.icons.filled.BluetoothDisabled
 import androidx.compose.material.icons.filled.BluetoothSearching
@@ -31,9 +33,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.ghhccghk.yadeahook.bluetooth.BleManager
@@ -55,27 +56,21 @@ fun DeviceControlScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     
-    // 蓝牙管理器
     val bleManager = remember { BleManager(context) }
     val speedMapper = remember { SpeedStrengthMapper(context) }
     
-    // 状态
     var isScanning by remember { mutableStateOf(false) }
     var isConnected by remember { mutableStateOf(false) }
     var isConnecting by remember { mutableStateOf(false) }
     var connectedDeviceName by remember { mutableStateOf<String?>(null) }
     var batteryLevel by remember { mutableIntStateOf(-1) }
-    var currentStrengthA by remember { mutableIntStateOf(0) }
-    var currentStrengthB by remember { mutableIntStateOf(0) }
-    var manualStrengthA by remember { mutableFloatStateOf(0f) }
-    var manualStrengthB by remember { mutableFloatStateOf(0f) }
+    var manualStrengthA by remember { mutableStateOf(0f) }
+    var manualStrengthB by remember { mutableStateOf(0f) }
     var isAutoMode by remember { mutableStateOf(true) }
     var deviceVersion by remember { mutableStateOf(CoyoteProtocol.Version.V3) }
-    
-    // 扫描到的设备列表
     var scannedDevices by remember { mutableStateOf<List<BluetoothDevice>>(emptyList()) }
+    var hasBluetoothPermission by remember { mutableStateOf(checkBluetoothPermission(context)) }
     
-    // 设置回调
     DisposableEffect(Unit) {
         bleManager.connectionStateCallback = object : BleManager.ConnectionStateCallback {
             override fun onConnecting(device: BluetoothDevice) {
@@ -102,9 +97,7 @@ fun DeviceControlScreen(modifier: Modifier = Modifier) {
         }
         
         bleManager.dataCallback = object : BleManager.DataCallback {
-            override fun onStrengthUpdate(sequenceNumber: Int, strength: Int) {
-                // 更新当前强度显示
-            }
+            override fun onStrengthUpdate(sequenceNumber: Int, strength: Int) {}
             
             override fun onBatteryLevelUpdate(level: Int) {
                 batteryLevel = level
@@ -134,12 +127,10 @@ fun DeviceControlScreen(modifier: Modifier = Modifier) {
         }
     }
     
-    // 生命周期观察
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_PAUSE -> {
-                    // 断开连接
                     bleManager.disconnect()
                 }
                 else -> {}
@@ -158,13 +149,41 @@ fun DeviceControlScreen(modifier: Modifier = Modifier) {
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 标题
         Text(
             text = "设备控制",
             style = MaterialTheme.typography.headlineMedium
         )
         
         Spacer(modifier = Modifier.height(24.dp))
+        
+        // 权限提示
+        if (!hasBluetoothPermission) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "需要蓝牙权限",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "请在系统设置中授予蓝牙权限",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
         
         // 连接状态卡片
         Card(
@@ -173,7 +192,7 @@ fun DeviceControlScreen(modifier: Modifier = Modifier) {
                 containerColor = if (isConnected) {
                     MaterialTheme.colorScheme.primaryContainer
                 } else {
-                    MaterialTheme.colorScheme.errorContainer
+                    MaterialTheme.colorScheme.surfaceVariant
                 }
             )
         ) {
@@ -183,7 +202,6 @@ fun DeviceControlScreen(modifier: Modifier = Modifier) {
                     .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // 状态图标
                 Icon(
                     imageVector = when {
                         isConnected -> Icons.Default.BluetoothConnected
@@ -195,13 +213,12 @@ fun DeviceControlScreen(modifier: Modifier = Modifier) {
                     tint = if (isConnected) {
                         MaterialTheme.colorScheme.primary
                     } else {
-                        MaterialTheme.colorScheme.error
+                        MaterialTheme.colorScheme.onSurfaceVariant
                     }
                 )
                 
                 Spacer(modifier = Modifier.height(8.dp))
                 
-                // 状态文本
                 Text(
                     text = when {
                         isConnected -> "已连接: $connectedDeviceName"
@@ -211,12 +228,9 @@ fun DeviceControlScreen(modifier: Modifier = Modifier) {
                     style = MaterialTheme.typography.titleMedium
                 )
                 
-                // 电池电量
                 if (isConnected && batteryLevel >= 0) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = "电池: $batteryLevel%",
                             style = MaterialTheme.typography.bodyMedium
@@ -261,7 +275,7 @@ fun DeviceControlScreen(modifier: Modifier = Modifier) {
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                // 扫描/连接按钮
+                // 操作按钮
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center
@@ -269,6 +283,10 @@ fun DeviceControlScreen(modifier: Modifier = Modifier) {
                     if (!isConnected && !isConnecting) {
                         Button(
                             onClick = {
+                                if (!hasBluetoothPermission) {
+                                    hasBluetoothPermission = checkBluetoothPermission(context)
+                                    return@Button
+                                }
                                 if (isScanning) {
                                     bleManager.stopScan()
                                 } else {
@@ -277,7 +295,7 @@ fun DeviceControlScreen(modifier: Modifier = Modifier) {
                                     isScanning = true
                                 }
                             },
-                            enabled = bleManager.isBluetoothAvailable()
+                            enabled = hasBluetoothPermission && bleManager.isBluetoothAvailable()
                         ) {
                             if (isScanning) {
                                 CircularProgressIndicator(
@@ -298,9 +316,7 @@ fun DeviceControlScreen(modifier: Modifier = Modifier) {
                             Text("紧急停止")
                         }
                         Spacer(modifier = Modifier.width(8.dp))
-                        Button(
-                            onClick = { bleManager.disconnect() }
-                        ) {
+                        Button(onClick = { bleManager.disconnect() }) {
                             Text("断开连接")
                         }
                     }
@@ -310,11 +326,9 @@ fun DeviceControlScreen(modifier: Modifier = Modifier) {
         
         Spacer(modifier = Modifier.height(16.dp))
         
-        // 扫描结果列表
+        // 扫描结果
         if (scannedDevices.isNotEmpty() && !isConnected) {
-            Card(
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -324,14 +338,10 @@ fun DeviceControlScreen(modifier: Modifier = Modifier) {
                         text = "发现设备",
                         style = MaterialTheme.typography.titleMedium
                     )
-                    
                     Spacer(modifier = Modifier.height(8.dp))
-                    
                     scannedDevices.forEach { device ->
                         Button(
-                            onClick = {
-                                bleManager.connect(device, deviceVersion)
-                            },
+                            onClick = { bleManager.connect(device, deviceVersion) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
@@ -341,15 +351,12 @@ fun DeviceControlScreen(modifier: Modifier = Modifier) {
                     }
                 }
             }
-            
             Spacer(modifier = Modifier.height(16.dp))
         }
         
-        // 强度控制卡片
+        // 强度控制
         if (isConnected) {
-            Card(
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -362,7 +369,6 @@ fun DeviceControlScreen(modifier: Modifier = Modifier) {
                     
                     Spacer(modifier = Modifier.height(16.dp))
                     
-                    // 模式切换
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.Center
@@ -393,32 +399,20 @@ fun DeviceControlScreen(modifier: Modifier = Modifier) {
                     Spacer(modifier = Modifier.height(16.dp))
                     
                     if (isAutoMode) {
-                        // 自动模式提示
-                        Text(
-                            text = "自动模式下，强度将根据车速自动调节",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
                         val config = speedMapper.getConfig()
                         Text(
-                            text = "最大强度: ${config.maxStrength}",
+                            text = "自动模式：强度根据车速自动调节",
                             style = MaterialTheme.typography.bodyMedium
                         )
-                        Text(
-                            text = "控制通道: ${config.channel.name}",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("最大强度: ${config.maxStrength}")
+                        Text("控制通道: ${config.channel.name}")
                     } else {
-                        // 手动模式滑块
                         Text("A 通道强度: ${manualStrengthA.toInt()}")
                         Slider(
                             value = manualStrengthA,
-                            onValueChange = { 
+                            onValueChange = {
                                 manualStrengthA = it
-                                currentStrengthA = it.toInt()
                                 bleManager.setStrength(CoyoteProtocol.Channel.A, it.toInt())
                             },
                             valueRange = 0f..200f,
@@ -430,9 +424,8 @@ fun DeviceControlScreen(modifier: Modifier = Modifier) {
                         Text("B 通道强度: ${manualStrengthB.toInt()}")
                         Slider(
                             value = manualStrengthB,
-                            onValueChange = { 
+                            onValueChange = {
                                 manualStrengthB = it
-                                currentStrengthB = it.toInt()
                                 bleManager.setStrength(CoyoteProtocol.Channel.B, it.toInt())
                             },
                             valueRange = 0f..200f,
@@ -445,8 +438,6 @@ fun DeviceControlScreen(modifier: Modifier = Modifier) {
                             onClick = {
                                 manualStrengthA = 0f
                                 manualStrengthB = 0f
-                                currentStrengthA = 0
-                                currentStrengthB = 0
                                 bleManager.zeroStrength()
                             },
                             modifier = Modifier.fillMaxWidth(),
@@ -460,5 +451,14 @@ fun DeviceControlScreen(modifier: Modifier = Modifier) {
                 }
             }
         }
+    }
+}
+
+private fun checkBluetoothPermission(context: android.content.Context): Boolean {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED &&
+        ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+    } else {
+        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
     }
 }

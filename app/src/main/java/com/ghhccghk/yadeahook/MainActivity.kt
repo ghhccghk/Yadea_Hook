@@ -1,12 +1,16 @@
 ﻿package com.ghhccghk.yadeahook
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -22,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.core.content.ContextCompat
 import com.ghhccghk.yadeahook.ui.DeviceControlScreen
 import com.ghhccghk.yadeahook.ui.LogScreen
 import com.ghhccghk.yadeahook.ui.SettingsScreen
@@ -29,6 +34,30 @@ import com.ghhccghk.yadeahook.ui.theme.YadeaHookTheme
 
 class MainActivity : ComponentActivity() {
     private var speedAlertReceiver: SpeedAlertReceiver? = null
+    
+    // 蓝牙权限申请
+    private val bluetoothPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        arrayOf(
+            Manifest.permission.BLUETOOTH_SCAN,
+            Manifest.permission.BLUETOOTH_CONNECT,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        )
+    } else {
+        arrayOf(
+            Manifest.permission.ACCESS_FINE_LOCATION
+        )
+    }
+    
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val allGranted = permissions.entries.all { it.value }
+        if (allGranted) {
+            Toast.makeText(this, "蓝牙权限已授予", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "需要蓝牙权限才能连接设备", Toast.LENGTH_LONG).show()
+        }
+    }
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,6 +76,7 @@ class MainActivity : ComponentActivity() {
                 filter
             )
         }
+        requestBluetoothPermissions()
 
 
         setContent {
@@ -62,6 +92,16 @@ class MainActivity : ComponentActivity() {
             speedAlertReceiver = null
         }
         super.onDestroy()
+    }
+    
+    private fun requestBluetoothPermissions() {
+        val permissionsToRequest = bluetoothPermissions.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }.toTypedArray()
+        
+        if (permissionsToRequest.isNotEmpty()) {
+            requestPermissionLauncher.launch(permissionsToRequest)
+        }
     }
 }
 
