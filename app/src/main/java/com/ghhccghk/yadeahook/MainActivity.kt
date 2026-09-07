@@ -1,8 +1,6 @@
-package com.ghhccghk.yadeahook
+﻿package com.ghhccghk.yadeahook
 
-import android.annotation.SuppressLint
 import android.content.IntentFilter
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -22,13 +20,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import com.ghhccghk.yadeahook.ui.DeviceControlScreen
 import com.ghhccghk.yadeahook.ui.LogScreen
 import com.ghhccghk.yadeahook.ui.SettingsScreen
 import com.ghhccghk.yadeahook.ui.theme.YadeaHookTheme
 
 class MainActivity : ComponentActivity() {
     private var speedAlertReceiver: SpeedAlertReceiver? = null
-
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -36,17 +35,8 @@ class MainActivity : ComponentActivity() {
         // 注册速度警报广播接收器
         speedAlertReceiver = SpeedAlertReceiver()
         val filter = IntentFilter(SpeedAlertReceiver.ACTION)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(speedAlertReceiver, filter,RECEIVER_EXPORTED)
-        } else {
-            @SuppressLint("UnspecifiedRegisterReceiverFlag")
-            @Suppress("DEPRECATION")
-            applicationContext.registerReceiver(
-                speedAlertReceiver,
-                filter
-            )
-        }
-
+        registerReceiver(speedAlertReceiver, filter)
+        
         setContent {
             YadeaHookTheme {
                 YadeaHookApp()
@@ -55,7 +45,6 @@ class MainActivity : ComponentActivity() {
     }
     
     override fun onDestroy() {
-        // 注销广播接收器
         speedAlertReceiver?.let {
             unregisterReceiver(it)
             speedAlertReceiver = null
@@ -88,8 +77,7 @@ fun YadeaHookApp() {
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
             when (currentDestination) {
                 AppDestinations.HOME -> LogScreen(modifier = Modifier.padding(innerPadding))
-                AppDestinations.FAVORITES -> PlaceholderScreen("Favorites", Modifier.padding(innerPadding))
-                AppDestinations.PROFILE -> PlaceholderScreen("Profile", Modifier.padding(innerPadding))
+                AppDestinations.DEVICE -> DeviceControlScreen(modifier = Modifier.padding(innerPadding))
                 AppDestinations.SETTINGS -> SettingsScreen(modifier = Modifier.padding(innerPadding))
             }
         }
@@ -108,7 +96,6 @@ enum class AppDestinations(
     val icon: Int,
 ) {
     HOME("Home", R.drawable.ic_home),
-    FAVORITES("Favorites", R.drawable.ic_favorite),
-    PROFILE("Profile", R.drawable.ic_account_box),
+    DEVICE("Device", R.drawable.ic_bluetooth),
     SETTINGS("Settings", R.drawable.ic_settings),
 }
