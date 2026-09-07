@@ -8,6 +8,7 @@ import com.ghhccghk.yadeahook.hooks.BleAuthCaptureHook
 import com.ghhccghk.yadeahook.hooks.BleConnectStateHook
 import com.ghhccghk.yadeahook.hooks.CredentialExtractHook
 import com.ghhccghk.yadeahook.hooks.ScooterStatusHook
+import com.ghhccghk.yadeahook.hooks.SpeedAlertHook
 import com.ghhccghk.yadeahook.hooks.VehicleControlHook
 import com.ghhccghk.yadeahook.hooks.VehicleDataReadHook
 import com.ghhccghk.yadeahook.hooks.VehicleServiceOnNotifyDataCallBackHook
@@ -41,7 +42,8 @@ object VehicleServiceLoad {
             VehicleDataReadHook(),
             VehicleServiceOnNotifyDataCallBackHook(),
             BleAuthCaptureHook(),
-            CredentialExtractHook()
+            CredentialExtractHook(),
+            SpeedAlertHook()
         )
 
         hooks.forEach { hook ->
