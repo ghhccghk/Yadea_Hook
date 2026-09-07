@@ -25,7 +25,7 @@ class SpeedStrengthMapper(private val context: Context) {
             CurvePoint(15f, 20f),
             CurvePoint(25f, 50f),
             CurvePoint(35f, 80f),
-            CurvePoint(50f, 100f)
+            CurvePoint(60f, 100f)
         )
     }
     
