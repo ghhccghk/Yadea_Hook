@@ -191,6 +191,13 @@ class SpeedStrengthMapper(private val context: Context) {
     fun resetToDefault() {
         saveCurvePoints(DEFAULT_CURVE)
     }
+
+    /**
+     * 恢复全部默认配置（包括启用状态、通道和最大强度）。
+     */
+    fun resetAll() {
+        prefs.edit().clear().apply()
+    }
     
     /**
      * 获取曲线数据用于图表显示

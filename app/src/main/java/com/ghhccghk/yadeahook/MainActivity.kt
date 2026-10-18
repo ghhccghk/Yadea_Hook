@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.core.content.ContextCompat
+import com.ghhccghk.yadeahook.bluetooth.SpeedStrengthMapper
 import com.ghhccghk.yadeahook.ui.DeviceControlScreen
 import com.ghhccghk.yadeahook.ui.LogScreen
 import com.ghhccghk.yadeahook.ui.SettingsScreen
@@ -76,7 +77,9 @@ class MainActivity : ComponentActivity() {
                 filter
             )
         }
-        requestBluetoothPermissions()
+        if (SpeedStrengthMapper(this).isEnabled()) {
+            requestBluetoothPermissions()
+        }
 
 
         setContent {

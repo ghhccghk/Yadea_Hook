@@ -5,6 +5,8 @@ import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,6 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -59,6 +62,7 @@ fun DeviceControlScreen(modifier: Modifier = Modifier) {
     val bleManager = remember { BleManager(context) }
     val speedMapper = remember { SpeedStrengthMapper(context) }
     
+    var featureEnabled by remember { mutableStateOf(speedMapper.isEnabled()) }
     var isScanning by remember { mutableStateOf(false) }
     var isConnected by remember { mutableStateOf(false) }
     var isConnecting by remember { mutableStateOf(false) }
@@ -70,6 +74,21 @@ fun DeviceControlScreen(modifier: Modifier = Modifier) {
     var deviceVersion by remember { mutableStateOf(CoyoteProtocol.Version.V3) }
     var scannedDevices by remember { mutableStateOf<List<BluetoothDevice>>(emptyList()) }
     var hasBluetoothPermission by remember { mutableStateOf(checkBluetoothPermission(context)) }
+
+    val requiredPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        arrayOf(
+            Manifest.permission.BLUETOOTH_SCAN,
+            Manifest.permission.BLUETOOTH_CONNECT,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        )
+    } else {
+        arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        hasBluetoothPermission = checkBluetoothPermission(context)
+    }
     
     DisposableEffect(Unit) {
         bleManager.connectionStateCallback = object : BleManager.ConnectionStateCallback {
@@ -149,41 +168,90 @@ fun DeviceControlScreen(modifier: Modifier = Modifier) {
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = "设备控制",
-            style = MaterialTheme.typography.headlineMedium
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "设备控制",
+                style = MaterialTheme.typography.headlineMedium
+            )
+            Switch(
+                checked = featureEnabled,
+                onCheckedChange = { enabled ->
+                    if (!enabled) {
+                        bleManager.stopScan()
+                        bleManager.zeroStrength()
+                        bleManager.disconnect()
+                        isScanning = false
+                        scannedDevices = emptyList()
+                    }
+                    featureEnabled = enabled
+                    speedMapper.setEnabled(enabled)
+                }
+            )
+        }
         
         Spacer(modifier = Modifier.height(24.dp))
-        
-        // 权限提示
-        if (!hasBluetoothPermission) {
+
+        if (!featureEnabled) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
                 )
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .padding(16.dp)
                 ) {
                     Text(
-                        text = "需要蓝牙权限",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.error
+                        text = "设备控制已关闭",
+                        style = MaterialTheme.typography.titleMedium
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "请在系统设置中授予蓝牙权限",
-                        style = MaterialTheme.typography.bodyMedium
+                        text = "开启上方开关后可扫描和连接蓝牙设备。",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp))
-        }
+        } else {
+            // 权限提示
+            if (!hasBluetoothPermission) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "需要蓝牙权限",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "需要蓝牙权限才能扫描和连接设备",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(onClick = { permissionLauncher.launch(requiredPermissions) }) {
+                            Text("授予权限")
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
         
         // 连接状态卡片
         Card(
@@ -449,6 +517,7 @@ fun DeviceControlScreen(modifier: Modifier = Modifier) {
                         }
                     }
                 }
+            }
             }
         }
     }

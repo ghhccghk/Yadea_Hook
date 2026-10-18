@@ -1,3 +1,7 @@
+> ⚠️ **本文为早期快速分析，部分结论已被修正/细化。**
+> 请以 [`登录逻辑完整实现指南.md`](./登录逻辑完整实现指南.md) 及 4 份专题文档为准：
+> `login-ui-flows.md` / `login-network-model.md` / `login-session-interceptors.md` / `login-thirdparty-bind.md`。
+> 主要勘误：①请求默认经 AES 网关签名（gatewaySign/gatewayTimestamp），非直接 JSON；②`cIDJ9f05d1604703` 是 AES-ECB 密钥而非普通签名密钥；③token 失效由业务码 101000/100995 驱动而非 HTTP 401；④OtherLoginBean.type 为 0=微信、1=QQ。
 # Yadea SmartMoto 登录API分析文档
 
 ## 概述
@@ -301,3 +305,4 @@ public class OtherLoginBean {
 ---
 
 *本文档基于静态代码分析生成，实际API可能因版本更新而变化。*
+

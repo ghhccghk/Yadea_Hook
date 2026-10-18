@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.ghhccghk.yadeahook.FeatureSettings
 import com.ghhccghk.yadeahook.bluetooth.CoyoteProtocol
 import com.ghhccghk.yadeahook.bluetooth.SpeedStrengthMapper
 import java.io.File
@@ -50,13 +51,22 @@ import java.io.File
 @Composable
 fun SettingsScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("speed_alert_prefs", Context.MODE_PRIVATE) }
+    val prefs = remember { FeatureSettings.speedAlertPrefs(context) }
     val speedMapper = remember { SpeedStrengthMapper(context) }
     
     // 速度警报设置
-    var selectedAudioPath by remember { mutableStateOf(prefs.getString("audio_path", "") ?: "") }
-    var speedThreshold by remember { mutableStateOf(prefs.getFloat("speed_threshold", 25f).toString()) }
-    var cooldownSeconds by remember { mutableStateOf((prefs.getLong("cooldown_ms", 10000L) / 1000).toString()) }
+    var speedAlertEnabled by remember { mutableStateOf(FeatureSettings.isSpeedAlertEnabled(context)) }
+    var selectedAudioPath by remember {
+        mutableStateOf(prefs.getString(FeatureSettings.KEY_AUDIO_PATH, "") ?: "")
+    }
+    var speedThreshold by remember {
+        mutableStateOf(prefs.getFloat(FeatureSettings.KEY_SPEED_THRESHOLD, 25f).toString())
+    }
+    var cooldownSeconds by remember {
+        mutableStateOf(
+            (prefs.getLong(FeatureSettings.KEY_COOLDOWN_MS, 10_000L) / 1000).toString()
+        )
+    }
     
     // 设备控制设置
     var mappingConfig by remember { mutableStateOf(speedMapper.getConfig()) }
@@ -70,7 +80,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             val copiedPath = copyAudioToPrivateStorage(context, audioUri)
             if (copiedPath != null) {
                 selectedAudioPath = copiedPath
-                prefs.edit().putString("audio_path", copiedPath).apply()
+                prefs.edit().putString(FeatureSettings.KEY_AUDIO_PATH, copiedPath).apply()
             }
         }
     }
@@ -89,8 +99,8 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         )
         
         Spacer(modifier = Modifier.height(24.dp))
-        
-        // ============ 速度警报设置 ============
+
+        // ============ 功能开关 ============
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
@@ -99,9 +109,65 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "速度警报",
+                    text = "功能开关",
                     style = MaterialTheme.typography.titleMedium
                 )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                FeatureToggleRow(
+                    title = "速度警报",
+                    subtitle = "超过设定速度时播放提示音",
+                    checked = speedAlertEnabled,
+                    onCheckedChange = { enabled ->
+                        speedAlertEnabled = enabled
+                        FeatureSettings.setSpeedAlertEnabled(context, enabled)
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                FeatureToggleRow(
+                    title = "设备控制",
+                    subtitle = "连接并控制 DG-LAB 蓝牙设备",
+                    checked = mappingConfig.enabled,
+                    onCheckedChange = { enabled ->
+                        mappingConfig = mappingConfig.copy(enabled = enabled)
+                        speedMapper.saveConfig(mappingConfig)
+                    }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // ============ 速度警报设置 ============
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "速度警报",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = if (speedAlertEnabled) "已开启" else "已关闭",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (speedAlertEnabled) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                }
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 
@@ -215,7 +281,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     Button(
                         onClick = {
                             selectedAudioPath = ""
-                            prefs.edit().remove("audio_path").apply()
+                            prefs.edit().remove(FeatureSettings.KEY_AUDIO_PATH).apply()
                         },
                         modifier = Modifier.weight(1f)
                     ) {
@@ -248,25 +314,22 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             )
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "设备控制",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                // 启用开关
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("启用设备控制")
-                    Switch(
-                        checked = mappingConfig.enabled,
-                        onCheckedChange = { enabled ->
-                            mappingConfig = mappingConfig.copy(enabled = enabled)
-                            speedMapper.saveConfig(mappingConfig)
+                    Text(
+                        text = "设备控制",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = if (mappingConfig.enabled) "已开启" else "已关闭",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (mappingConfig.enabled) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
                         }
                     )
                 }
@@ -375,8 +438,9 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 val cooldown = (cooldownSeconds.toLongOrNull() ?: 10L) * 1000L
                 
                 prefs.edit().apply {
-                    putFloat("speed_threshold", threshold)
-                    putLong("cooldown_ms", cooldown)
+                    putBoolean(FeatureSettings.KEY_SPEED_ALERT_ENABLED, speedAlertEnabled)
+                    putFloat(FeatureSettings.KEY_SPEED_THRESHOLD, threshold)
+                    putLong(FeatureSettings.KEY_COOLDOWN_MS, cooldown)
                     apply()
                 }
             },
@@ -392,8 +456,10 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 speedThreshold = "25"
                 cooldownSeconds = "10"
                 selectedAudioPath = ""
+                speedAlertEnabled = true
+                showCurveEditor = false
                 prefs.edit().clear().apply()
-                speedMapper.resetToDefault()
+                speedMapper.resetAll()
                 mappingConfig = speedMapper.getConfig()
             },
             modifier = Modifier.fillMaxWidth()
@@ -402,6 +468,40 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         }
         
         Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+@Composable
+private fun FeatureToggleRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 16.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange
+        )
     }
 }
 

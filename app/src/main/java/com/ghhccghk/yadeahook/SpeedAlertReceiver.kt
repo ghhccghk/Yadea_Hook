@@ -3,6 +3,7 @@ package com.ghhccghk.yadeahook
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.media.MediaPlayer
 import android.util.Log
 import java.io.File
@@ -15,26 +16,32 @@ class SpeedAlertReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != ACTION) return
-        
+
         val speed = intent.getFloatExtra(EXTRA_SPEED, 0f)
-        
-        // 读取设置
-        val prefs = context.getSharedPreferences("speed_alert_prefs", Context.MODE_PRIVATE)
-        val speedThreshold = prefs.getFloat("speed_threshold", 25f)
-        
-        Log.d("YadeaHook", "收到速度警报广播:  $speed km/h (阈值:  $speedThreshold km/h)")
-        
-        // 播放音频
-        if (speed >= speedThreshold) {
-            playAlertSound(context)
-        }
+
+        val prefs = FeatureSettings.speedAlertPrefs(context)
+        if (!prefs.getBoolean(FeatureSettings.KEY_SPEED_ALERT_ENABLED, true)) return
+
+        val speedThreshold = prefs.getFloat(FeatureSettings.KEY_SPEED_THRESHOLD, 25f)
+        if (!speed.isFinite() || speed < speedThreshold) return
+
+        val now = System.currentTimeMillis()
+        val cooldownMs = prefs.getLong(FeatureSettings.KEY_COOLDOWN_MS, 10_000L)
+            .coerceAtLeast(0L)
+        val lastAlertAt = prefs.getLong(FeatureSettings.KEY_LAST_ALERT_AT, 0L)
+        if (lastAlertAt > 0 && now - lastAlertAt < cooldownMs) return
+
+        prefs.edit()
+            .putLong(FeatureSettings.KEY_LAST_ALERT_AT, now)
+            .apply()
+        Log.d("YadeaHook", "收到速度警报广播: $speed km/h (阈值: $speedThreshold km/h)")
+        playAlertSound(context, prefs)
     }
 
-    private fun playAlertSound(context: Context) {
+    private fun playAlertSound(context: Context, prefs: SharedPreferences) {
         try {
-            val prefs = context.getSharedPreferences("speed_alert_prefs", Context.MODE_PRIVATE)
-            val customPath = prefs.getString("audio_path", "")
-            
+            val customPath = prefs.getString(FeatureSettings.KEY_AUDIO_PATH, "")
+
             if (!customPath.isNullOrEmpty() && File(customPath).exists()) {
                 playCustomAudio(context, customPath)
             } else {

@@ -9,8 +9,6 @@ import io.github.lingqiqi5211.ezhooktool.core.findMethod
 import io.github.lingqiqi5211.ezhooktool.xposed.dsl.createHook
 
 class SpeedAlertHook : BaseHook() {
-    private var lastAlertTime = 0L
-
     companion object {
         const val ACTION_SPEED_ALERT = "com.ghhccghk.yadeahook.SPEED_ALERT"
         const val EXTRA_SPEED = "speed"
@@ -81,7 +79,7 @@ class SpeedAlertHook : BaseHook() {
                 putExtra(EXTRA_SPEED, speed)
             }
             appContext.sendBroadcast(intent)
-            logHook("SpeedAlert", "发送速度警报广播:  km/h")
+            logHook("SpeedAlert", "发送速度警报广播: $speed km/h")
         } catch (e: Throwable) {
             Log.e(TAG, "发送广播失败", e)
             logHook("SpeedAlert", "发送广播失败: ")
