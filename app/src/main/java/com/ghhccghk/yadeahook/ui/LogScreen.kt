@@ -16,14 +16,19 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -49,7 +54,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.core.content.FileProvider
+import com.ghhccghk.yadeahook.LoginCaptureStore
 import com.ghhccghk.yadeahook.VehicleControlReceiver
 import com.ghhccghk.yadeahook.provider.HookLogger
 import java.io.File
@@ -62,12 +69,16 @@ private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun LogScreen(modifier: Modifier = Modifier) {
+fun LogScreen(
+    modifier: Modifier = Modifier,
+    loginCaptureRefresh: Int = 0
+) {
     val context = LocalContext.current
     val logs = LogReceiver.logs
     val listState = rememberLazyListState()
     var ttpExpanded by remember { mutableStateOf(false) }
     var authRefresh by remember { mutableStateOf(0) }
+    var showLoginDialog by remember { mutableStateOf(false) }
 
     DisposableEffect(Unit) {
         val receiver = LogReceiver()
@@ -89,6 +100,19 @@ fun LogScreen(modifier: Modifier = Modifier) {
     val authKey = remember(authRefresh) { com.ghhccghk.yadeahook.BleAuthStore.keyHex }
     val authInit = remember(authRefresh) { com.ghhccghk.yadeahook.BleAuthStore.initHex }
     val authText = remember(authRefresh) { com.ghhccghk.yadeahook.BleAuthStore.sequenceText() }
+    val loginCapture = remember(loginCaptureRefresh) { LoginCaptureStore.snapshot() }
+    val hasLoginData = listOf(
+        loginCapture.loginToken,
+        loginCapture.gyuid,
+        loginCapture.usrToken,
+        loginCapture.businessJson,
+        loginCapture.gatewayFields,
+        loginCapture.requestHeaders,
+        loginCapture.registrationId,
+        loginCapture.oppoPushId,
+        loginCapture.userInfo,
+        loginCapture.lastError
+    ).any { it.isNotBlank() }
 
     LaunchedEffect(logs.size) {
         if (logs.isNotEmpty()) {
@@ -113,6 +137,33 @@ fun LogScreen(modifier: Modifier = Modifier) {
         Toast.makeText(context, "已发送: $command", Toast.LENGTH_SHORT).show()
     }
 
+    fun copyText(label: String, text: String) {
+        if (text.isBlank()) {
+            Toast.makeText(context, "$label 为空", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("YD-$label", text))
+        Toast.makeText(context, "已复制 $label", Toast.LENGTH_SHORT).show()
+    }
+
+    fun shareText(label: String, text: String) {
+        if (text.isBlank()) {
+            Toast.makeText(context, "$label 为空", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, "YadeaHook $label")
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+        try {
+            context.startActivity(Intent.createChooser(send, "分享 $label"))
+        } catch (e: Exception) {
+            Toast.makeText(context, "分享失败: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     Column(modifier = modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
@@ -121,8 +172,18 @@ fun LogScreen(modifier: Modifier = Modifier) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Hook 日志", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Hook 日志",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f)
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                OutlinedButton(
+                    onClick = { copyText("登录数据", loginCapture.asText()) },
+                    enabled = hasLoginData
+                ) {
+                    Text("一键复制", fontSize = 12.sp)
+                }
                 OutlinedButton(
                     onClick = {
                         val logsToExport = logs.toList()
@@ -243,6 +304,54 @@ fun LogScreen(modifier: Modifier = Modifier) {
             }
         }
 
+        // 登录链路抓取摘要
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    "登录抓取",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    if (hasLoginData) {
+                        "已抓到登录数据，可直接复制全部"
+                    } else {
+                        "尚未抓到登录数据（触发一键登录或登录请求后刷新）"
+                    },
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (hasLoginData) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { copyText("登录数据", loginCapture.asText()) },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("一键复制全部", fontSize = 12.sp)
+                        }
+                        OutlinedButton(
+                            onClick = { showLoginDialog = true },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("查看完整内容", fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        }
+
         // TtpInfo 全量数据面板
         if (ttpEntry != null) {
             Card(
@@ -334,6 +443,109 @@ fun LogScreen(modifier: Modifier = Modifier) {
                             .fillMaxWidth()
                             .padding(vertical = 1.dp)
                     )
+                }
+            }
+        }
+    }
+
+    if (showLoginDialog && hasLoginData) {
+        LoginCaptureDialog(
+            snapshot = loginCapture,
+            onDismiss = { showLoginDialog = false },
+            onCopy = { label, text -> copyText(label, text) },
+            onShare = { label, text -> shareText(label, text) }
+        )
+    }
+}
+
+@Composable
+private fun LoginCaptureDialog(
+    snapshot: LoginCaptureStore.Snapshot,
+    onDismiss: () -> Unit,
+    onCopy: (String, String) -> Unit,
+    onShare: (String, String) -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.88f)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("登录抓取结果", style = MaterialTheme.typography.titleLarge)
+                    TextButton(onClick = onDismiss) {
+                        Text("关闭")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                SelectionContainer(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Text(
+                            text = snapshot.asText(),
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Button(onClick = { onCopy("登录数据", snapshot.asText()) }) {
+                        Text("一键复制全部", fontSize = 12.sp)
+                    }
+                    OutlinedButton(
+                        onClick = { onCopy("loginToken", snapshot.loginToken) },
+                        enabled = snapshot.loginToken.isNotBlank()
+                    ) {
+                        Text("复制 loginToken", fontSize = 12.sp)
+                    }
+                    OutlinedButton(
+                        onClick = { onCopy("gyuid", snapshot.gyuid) },
+                        enabled = snapshot.gyuid.isNotBlank()
+                    ) {
+                        Text("复制 gyuid", fontSize = 12.sp)
+                    }
+                    OutlinedButton(
+                        onClick = { onCopy("Bearer", snapshot.bearerToken()) },
+                        enabled = snapshot.usrToken.isNotBlank()
+                    ) {
+                        Text("复制 Bearer", fontSize = 12.sp)
+                    }
+                    OutlinedButton(
+                        onClick = { onCopy("业务 JSON", snapshot.businessJson) },
+                        enabled = snapshot.businessJson.isNotBlank()
+                    ) {
+                        Text("复制业务 JSON", fontSize = 12.sp)
+                    }
+                    OutlinedButton(
+                        onClick = { onCopy("请求头", snapshot.requestHeaders) },
+                        enabled = snapshot.requestHeaders.isNotBlank()
+                    ) {
+                        Text("复制请求头", fontSize = 12.sp)
+                    }
+                    OutlinedButton(onClick = { onShare("登录数据", snapshot.asText()) }) {
+                        Text("分享", fontSize = 12.sp)
+                    }
                 }
             }
         }

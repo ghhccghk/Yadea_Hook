@@ -2,6 +2,9 @@
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
@@ -19,12 +22,15 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.core.content.ContextCompat
 import com.ghhccghk.yadeahook.bluetooth.SpeedStrengthMapper
@@ -110,7 +116,27 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun YadeaHookApp() {
+    val context = LocalContext.current
     var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.HOME) }
+    var loginCaptureRefresh by remember { mutableStateOf(0) }
+
+    DisposableEffect(Unit) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent != null) LoginCaptureStore.applyFromIntent(intent)
+                loginCaptureRefresh++
+            }
+        }
+        val applicationContext = context.applicationContext
+        applicationContext.registerReceiver(
+            receiver,
+            IntentFilter(LoginCaptureStore.ACTION),
+            Context.RECEIVER_EXPORTED
+        )
+        onDispose {
+            applicationContext.unregisterReceiver(receiver)
+        }
+    }
 
     NavigationSuiteScaffold(
         navigationSuiteItems = {
@@ -131,7 +157,10 @@ fun YadeaHookApp() {
     ) {
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
             when (currentDestination) {
-                AppDestinations.HOME -> LogScreen(modifier = Modifier.padding(innerPadding))
+                AppDestinations.HOME -> LogScreen(
+                    modifier = Modifier.padding(innerPadding),
+                    loginCaptureRefresh = loginCaptureRefresh
+                )
                 AppDestinations.DEVICE -> DeviceControlScreen(modifier = Modifier.padding(innerPadding))
                 AppDestinations.SETTINGS -> SettingsScreen(modifier = Modifier.padding(innerPadding))
             }

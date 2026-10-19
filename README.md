@@ -33,6 +33,11 @@
 - **BLE Key 捕获** — 捕获雅迪 App 连接车辆时使用的蓝牙认证密钥。
 - **Device Token 抓取** — 从 OkHttp 响应中提取设备认证令牌。
 - **协议分析** — 通过 BleFrameClassifier 精确识别认证帧类型。
+- **一键登录抓取** — Hook `p46.a/b`，提取 `loginToken`、`gyuid` 和来源。
+- **登录成功抓取** — 捕获 `p46$a/p46$b` 回调及 `UserInfoBean` 中的用户和 token。
+- **业务 JSON / 网关签名** — Hook `f84.b`、`tb0.d`，保存签名前后完整数据。
+- **最终请求头** — Hook `sb0.intercept` 和 `Request.Builder.build()`，读取真正发出的请求头。
+- **usr_token** — Hook `zm3.z0/h2`，同时提供带 `Bearer ` 前缀的复制按钮。
 
 ### 📱 设备控制（ DG-LAB 协议）
 - **独立开关** — 在设置页或设备页开启，关闭时会停止扫描并断开设备连接。
@@ -46,6 +51,7 @@
 - **Material3 UI** — 基于 Compose 的现代化界面。
 - **三页面导航** — Home（日志和数据）、Device（设备控制）、Settings（设置）。
 - **功能开关** — 设置页统一控制速度警报和设备控制，修改后立即生效。
+- **登录抓取面板** — Home 页可复制 loginToken、gyuid、Bearer token、业务 JSON 和请求头。
 - **实时日志** — 显示 Hook 日志和完整的 TtpInfo 数据面板。
 - **曲线编辑器** — 可视化编辑速度-强度映射曲线。
 
@@ -165,6 +171,7 @@ MainHook → VehicleServiceLoad.initHooks(context)
   → VehicleServiceOnNotifyDataCallBackHook.init(classLoader, context)
   → BleAuthCaptureHook.init(classLoader, context)
   → CredentialExtractHook.init(classLoader, context)
+  → LoginCaptureHook.init(classLoader, context)
   → SpeedAlertHook.init(classLoader, context)
 ```
 
@@ -211,6 +218,7 @@ app/src/main/java/com/ghhccghk/yadeahook/
 ├── VehicleStatusStore.kt       # 全局车辆状态存储
 ├── VehicleController.kt        # 车辆控制命令发送器
 ├── BleAuthStore.kt             # BLE 认证序列存储
+├── LoginCaptureStore.kt        # 登录链路抓取结果与广播
 ├── SpeedAlertReceiver.kt       # 速度警报广播接收器
 ├── StatusUpdateReceiver.kt     # 状态更新广播接收器
 ├── VehicleControlReceiver.kt   # 车辆控制广播接收器
@@ -227,6 +235,7 @@ app/src/main/java/com/ghhccghk/yadeahook/
 │   ├── VehicleDataReadHook.kt  # 车辆数据读取 Hook
 │   ├── BleAuthCaptureHook.kt   # BLE 认证捕获 Hook
 │   ├── CredentialExtractHook.kt# 凭证提取 Hook
+│   ├── LoginCaptureHook.kt     # 登录/网关/请求头精确抓取 Hook
 │   └── SpeedAlertHook.kt       # 速度警报 Hook
 ├── protocol/
 │   └── BleFrameClassifier.kt   # BLE 帧分类器

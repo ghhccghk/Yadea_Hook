@@ -7,6 +7,7 @@ import androidx.core.content.ContextCompat
 import com.ghhccghk.yadeahook.hooks.BleAuthCaptureHook
 import com.ghhccghk.yadeahook.hooks.BleConnectStateHook
 import com.ghhccghk.yadeahook.hooks.CredentialExtractHook
+import com.ghhccghk.yadeahook.hooks.LoginCaptureHook
 import com.ghhccghk.yadeahook.hooks.ScooterStatusHook
 import com.ghhccghk.yadeahook.hooks.SpeedAlertHook
 import com.ghhccghk.yadeahook.hooks.VehicleControlHook
@@ -43,6 +44,7 @@ object VehicleServiceLoad {
             VehicleServiceOnNotifyDataCallBackHook(),
             BleAuthCaptureHook(),
             CredentialExtractHook(),
+            LoginCaptureHook(),
             SpeedAlertHook()
         )
 
