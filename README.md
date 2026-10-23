@@ -21,6 +21,7 @@
 - **设备扫描** — 扫描附近的 BLE 设备。
 - **多协议支持** — 支持滑板车、自行车、网络三种连接方式。
 - **认证捕获** — 捕获 BLE 认证序列（INIT/KEY/QUERY 等帧）用于调试。
+- **只读全链路抓包** — 覆盖 Android BLE 框架、原 App 五步连接任务、通知注册、命令生成、`tl` 写入入口、旧握手和 `wi` 通知解析器；不修改参数、返回值、调用流程或车辆状态。
 
 ### 🚨 超速警报
 - **独立开关** — 在设置页一键开启或关闭速度警报。
@@ -163,17 +164,49 @@ val text = intent.getStringExtra("text")
 ```
 MainHook → VehicleServiceLoad.initHooks(context)
   → 进程检查: 只在 com.yadea.smartmoto 主进程初始化
+  → 包名检查: 明确拒绝 top.ghhccghk.yadea 移植包
   → BleConnectStateHook.init(classLoader, context)
   → VehicleControlHook.init(classLoader, context)
   → VehicleStatusHook.init(classLoader, context)
   → ScooterStatusHook.init(classLoader, context)
   → VehicleDataReadHook.init(classLoader, context)
   → VehicleServiceOnNotifyDataCallBackHook.init(classLoader, context)
-  → BleAuthCaptureHook.init(classLoader, context)
+  → BleAuthCaptureHook.init(classLoader, context)       # Android BLE 框架只读抓包
+  → YadeaBleBusinessHook.init(classLoader, context)     # 原 App BLE 业务只读抓包
   → CredentialExtractHook.init(classLoader, context)
   → LoginCaptureHook.init(classLoader, context)
   → SpeedAlertHook.init(classLoader, context)
 ```
+
+### 只读 BLE 抓包
+
+先确认目标包名，且不要把作用域勾成移植包：
+
+```powershell
+adb shell pm list packages | Select-String -Pattern "yadea|smartmoto"
+```
+
+当前抓包覆盖：
+
+- **Android BLE 框架**：`connectGatt` 全部重载、`discoverServices`、`setCharacteristicNotification`、读写 descriptor/characteristic 全部公开重载、GATT callback 全部读写与连接回调、`onCharacteristicChanged` 新旧重载。
+- **实际回调分发**：连接时按实际 `BluetoothGattCallback` 运行时类补装覆写方法，同时匹配 framework 内部 `BluetoothGatt$1.onNotify(String,int,byte[])`。实际类名或描述符不匹配时只记录 `MISSING/ERROR`。
+- **GATT 数据库**：`onServicesDiscovered` 后输出 service、characteristic、descriptor、UUID、properties、writeType 和已有值。
+- **原 App 业务链路**：`BleBicycleConnect.z/v`、五步任务开始/完成/失败、`BleControlManager.d/s/e`、`BleBicycleCommandManager` 命令生成/字段快照、`tl.s0/Q/q0`、`wi.S/M/Z0`、`wi$g.f`、`wi$d.e`。
+- **握手与状态查询**：记录旧握手随机块、`wi$g.f` 实际握手数据、`0x34` 状态查询完整 HEX，以及生成前后 `increaseByteNum` 和全部命令管理字段。
+
+日志统一为 `YADEA_CAP` 结构化格式，例如：
+
+```text
+YADEA_CAP|SEQ=1|PID=1234|TID=5678|thread=Binder:1234_2|BLE|TX|hook=BleAuthCaptureHook|method=...|mac=AA:BB:CC:DD:EE:FF|runtime=com.yadea.blecontrol...|service=...|uuid=...|props=...|writeType=1|len=37|data=59443E...
+```
+
+`byte[]` 在进入日志前立即 `clone()`，统一输出大写连续 HEX。安装阶段的每个候选点都会输出 `INSTALLED` 或 `MISSING`；运行期异常输出带 Hook 类名和方法名的 `ERROR`，不会向原 App 抛出。
+
+本次静态核对结果：
+
+- **已有但仍复用**：`BleAuthCaptureHook` 的认证帧分类、`writeCharacteristic`、`setValue`、GATT 写确认、通知和连接状态；`VehicleServiceOnNotifyDataCallBackHook` 的业务通知对象监控。
+- **本次新增**：上述 Android BLE 完整框架 Hook、实际 app callback 覆写 Hook、`BluetoothGatt$1.onNotify` ROM 内部分发 Hook，以及 `YadeaBleBusinessHook` 的全部原 App 业务点。
+- **条件性未找到**：`BluetoothGatt$1.onNotify`、实际 app callback 覆写和混淆业务描述符取决于设备 ROM/App 版本；加载或匹配失败会直接出现在日志的 `MISSING` 项中。当前 `temp_smali`（8.8.9）中的业务类与描述符均已确认存在。
 
 ### BLE 协议分析
 - **BleFrameClassifier** — 基于协议指纹精确识别 BLE 帧类型（INIT、KEY、QUERY、START、STOP 等）。
@@ -233,7 +266,8 @@ app/src/main/java/com/ghhccghk/yadeahook/
 │   ├── VehicleStatusHook.kt    # 电动车状态 Hook
 │   ├── ScooterStatusHook.kt    # 滑板车状态 Hook
 │   ├── VehicleDataReadHook.kt  # 车辆数据读取 Hook
-│   ├── BleAuthCaptureHook.kt   # BLE 认证捕获 Hook
+│   ├── BleAuthCaptureHook.kt   # Android BLE 框架与认证只读捕获 Hook
+│   ├── YadeaBleBusinessHook.kt # 原 App BLE 业务链路只读捕获 Hook
 │   ├── CredentialExtractHook.kt# 凭证提取 Hook
 │   ├── LoginCaptureHook.kt     # 登录/网关/请求头精确抓取 Hook
 │   └── SpeedAlertHook.kt       # 速度警报 Hook

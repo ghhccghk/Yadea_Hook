@@ -14,18 +14,25 @@ import com.ghhccghk.yadeahook.hooks.VehicleControlHook
 import com.ghhccghk.yadeahook.hooks.VehicleDataReadHook
 import com.ghhccghk.yadeahook.hooks.VehicleServiceOnNotifyDataCallBackHook
 import com.ghhccghk.yadeahook.hooks.VehicleStatusHook
+import com.ghhccghk.yadeahook.hooks.YadeaBleBusinessHook
 import io.github.lingqiqi5211.ezhooktool.core.loadClassOrNull
 
 object VehicleServiceLoad {
     private const val TAG = "YadeaHook"
+    private const val TARGET_PACKAGE = "com.yadea.smartmoto"
     private const val PKG = "com.yadea.smartmoto.vehicle.service"
     internal var classLoader: ClassLoader? = null
         private set
 
     fun initHooks(context: Context) {
+        if (context.packageName != TARGET_PACKAGE) {
+            Log.w(TAG, "拒绝非目标包初始化: ${context.packageName}")
+            return
+        }
+
         // 只在主进程初始化，跳过 :pushservice、:remote 等子进程
         val processName = android.app.Application.getProcessName()
-        if (processName != "com.yadea.smartmoto") {
+        if (processName != TARGET_PACKAGE) {
             Log.d(TAG, "跳过子进程: $processName")
             return
         }
@@ -43,6 +50,7 @@ object VehicleServiceLoad {
             VehicleDataReadHook(),
             VehicleServiceOnNotifyDataCallBackHook(),
             BleAuthCaptureHook(),
+            YadeaBleBusinessHook(),
             CredentialExtractHook(),
             LoginCaptureHook(),
             SpeedAlertHook()

@@ -1,5 +1,5 @@
 [versions]
-agp = "9.3.2"
+agp = "9.4.1"
 gson = "2.14.0"
 miuixIcons = "0.9.3"
 xpoesdapi = "102.0.0"
