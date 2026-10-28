@@ -63,6 +63,10 @@ dependencies {
     implementation(libs.ezhooktool.core)
     implementation(libs.ezhooktool.hook.xposed.x102)
     implementation(libs.gson)
+    implementation(libs.superlyricapi)
+    implementation(libs.lyrics.ui)
+    implementation(libs.lyrics.core)
+    implementation(libs.hiddenapibypass)
 
     // 如果你的模块直接使用 Xposed / libxposed 的类型，
     // 还需要额外声明对应运行时 API。

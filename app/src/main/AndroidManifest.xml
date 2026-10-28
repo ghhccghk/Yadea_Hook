@@ -2,6 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- lyrics-ui 声明 minSdk 29；运行时仅在 Android 10+ 挂载 Compose 歌词条。 -->
+    <uses-sdk tools:overrideLibrary="com.mocharealm.accompanist.lyrics.ui" />
+
     <!-- 蓝牙权限 -->
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />

@@ -31,13 +31,22 @@ Single module `:app`. Source files under `app/src/main/java/com/ghhccghk/yadeaho
 - `ui/LogScreen.kt` — Compose 日志界面，显示 hook 日志和 TtpInfo 数据面板。
 - `ui/LogReceiver.kt` — 日志广播接收器。
 - `MainActivity.kt` — Compose UI 入口，`NavigationSuiteScaffold` 导航。
+- `hooks/NaviLyricHook.kt` — 在导航 Activity 生命周期内挂载/卸载投屏歌词 ComposeView。
+- `hooks/NaviScreenCaptureHook.kt` — 拦截百度/高德投屏 Bitmap，并在发送前绘制歌词叠加。
+- `lyrics/LyricOverlayController.kt` — 接收 SuperLyricApi 数据、管理屏幕外 ComposeView、同步绘制到 Bitmap。
+- `lyrics/LyricOverlayUi.kt` — 顶部歌词布局，优先逐字卡拉 OK，缺少逐字数据时回退普通同步行。
+- `lyrics/ComposeOwners.kt` — Hook 进程内 ComposeView 所需的 Lifecycle/SavedState/ViewModelStore owners。
+- `lyrics/MusicSource.kt` — 当前音乐软件名称与图标。
 
 ## Key Libraries
 
 | Library | Purpose |
 |---------|---------|
-| `ezhooktool` (v1.1.3) | Xposed hooking helper — use `EzXposed` for hook registration |
+| `ezhooktool` (v1.2.2) | Xposed hooking helper — use `EzXposed` for hook registration |
 | `libxposed:api` (v102.0.0) | Core Xposed module API — `compileOnly` only, not bundled |
+| `SuperLyricApi` (v3.7) | 从 SuperLyric 服务接收实时歌词、逐字时间、翻译和播放进度 |
+| `lyrics-ui` / `lyrics-core` (v1.0.19 / v0.4.5) | Accompanist Lyrics 的 `KaraokeLineText`、`SyncedLineText` 和歌词模型 |
+| `hiddenapibypass` (v6.1) | SuperLyric/Compose 相关隐藏 API 兼容 |
 
 ## Xposed Module Conventions
 
@@ -69,6 +78,34 @@ private fun initHooks() {
 ```
 
 Hook 模块的 `initHooks(context: Context)` 必须使用传入的 Context 的 ClassLoader 来查找类。
+
+## 投屏导航歌词叠加
+
+投屏歌词链路：
+
+```
+MainHook → VehicleServiceLoad.initHooks(context)
+  → NaviLyricHook: 导航 Activity onResume/onDestroy
+  → LyricOverlayController: 注册 ISuperLyricReceiver，挂载屏幕外 ComposeView
+  → NaviScreenCaptureHook: 拦截投屏 Bitmap
+  → LyricOverlayController.draw(canvas, bitmap): 在发送给仪表前叠加
+```
+
+### 歌词布局规则
+
+- `SuperLyricLine.words` 存在且时间有效时，转换成 `KaraokeLine.MainKaraokeLine`，使用 `KaraokeLineText` 逐字高亮。
+- 没有逐字数据、words 为空或时间无效时，使用 `SyncedLineText`。
+- 不使用仓库内的简化手绘歌词行；布局与逐字渲染以依赖中的 Accompanist Lyrics 组件为准。
+- SuperLyric 只在切行时下发增量包，`LyricOverlayUi.kt` 以当前 `SuperLyricData.position` 为锚点，结合 `SystemClock.elapsedRealtime()` 每 33ms 插值行内进度。
+- 翻译和来源行仍在同一顶部歌词条内；来源显示为图标在左、应用名在右。
+
+### Bitmap 约束
+
+- Compose 画布在首次投屏时调整为与目标 Bitmap 完全相同的宽高，坐标语义为 `1.dp = 1.px`、`1.sp = 1.px × fontScale`。
+- 目标 Bitmap 可能不可变；`NaviScreenCaptureHook` 会复制为可变的 `ARGB_8888` Bitmap，再把叠加结果回写到 Hook 参数。
+- 使用弱引用集合避免同一帧经过多个出口时重复叠加。
+- 当前覆盖出口包括百度 `captureViewToBitmap(View)`、WiFi/TFT 发送链路、图片压缩入口和百度放大图回调。
+- `lyrics-ui` 声明 minSdk 29，模块自身 minSdk 28；Android 10 以下跳过 Compose 歌词条。
 
 ## Hook 架构
 
@@ -199,12 +236,13 @@ method.createHook {
 
 ## Build Config Notes
 
-- **AGP 9.2.1**, Kotlin 2.4.10, Gradle 9.4.1
+- **AGP 9.4.1**, Kotlin 2.4.10, Gradle 9.7.1；daemon JVM 为 Java 21
 - `compileSdk` uses the `release(37)` syntax with `minorApiLevel = 1` — non-standard, don't flatten to a plain int.
 - Configuration cache enabled (`org.gradle.configuration-cache=true`).
 - `local.properties` is gitignored and auto-generated — contains `sdk.dir` path. Don't commit it.
 - Version catalog at `gradle/libs.versions.toml` — all dependency versions centralized there.
-- R8 keep rules in `app/src/main/keepRules/rules.keep` (currently empty/boilerplate).
+- R8 keep rules in `app/src/main/keepRules/rules.keep`；保留 SuperLyricApi 并忽略 `android.os.ServiceManager`。
+- JitPack 已在 `settings.gradle.kts` 配置，供 SuperLyricApi 使用。
 
 ## UI
 
@@ -215,6 +253,17 @@ Home tab shows:
 - TtpInfo 全量数据面板（可展开、可复制）
 - Hook 日志列表（实时更新）
 
+投屏歌词不属于模块主界面：它只在目标 App 的导航 Activity 存活时挂载屏幕外 ComposeView，并绘制到投屏 Bitmap。
+
 ## Testing
 
 Only placeholder tests exist (`ExampleUnitTest.kt`, `ExampleInstrumentedTest.kt`). No custom test fixtures or snapshot workflows.
+
+修改投屏歌词后至少运行：
+
+```bash
+./gradlew compileDebugKotlin
+./gradlew assembleDebug
+```
+
+真机验证需要重新投屏，并检查 logcat 中的 `YadeaHook-Lyric` 和 `NaviCapture` 日志。

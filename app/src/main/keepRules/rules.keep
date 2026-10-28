@@ -14,3 +14,7 @@
 
 # Keep VehicleController (accessed by reflection)
 -keep class com.ghhccghk.yadeahook.VehicleController { *; }
+
+# SuperLyricApi AIDL/Parcelable — library docs require keeping these names
+-dontwarn android.os.ServiceManager
+-keep class com.hchen.superlyricapi.** { *; }
