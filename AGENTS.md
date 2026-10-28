@@ -96,7 +96,7 @@ MainHook → VehicleServiceLoad.initHooks(context)
 - `SuperLyricLine.words` 存在且时间有效时，转换成 `KaraokeLine.MainKaraokeLine`，使用 `KaraokeLineText` 逐字高亮。
 - 没有逐字数据、words 为空或时间无效时，使用 `SyncedLineText`。
 - 不使用仓库内的简化手绘歌词行；布局与逐字渲染以依赖中的 Accompanist Lyrics 组件为准。
-- SuperLyric 只在切行时下发增量包，`LyricOverlayUi.kt` 以当前 `SuperLyricData.position` 为锚点，结合 `SystemClock.elapsedRealtime()` 每 33ms 插值行内进度。
+- SuperLyric 只在切行时下发增量包，`LyricOverlayUi.kt` 以当前 `SuperLyricData.position` 为锚点，结合 `SystemClock.elapsedRealtime()` 每 33ms 插值行内进度；每次 `onLyric` 刷新都递增独立 token，强制重置行内进度。
 - 翻译和来源行仍在同一顶部歌词条内；来源显示为图标在左、应用名在右。
 
 ### Bitmap 约束

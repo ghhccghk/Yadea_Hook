@@ -39,11 +39,12 @@ import kotlin.math.roundToInt
  */
 object LyricOverlayController {
     private const val TAG = "YadeaHook-Lyric"
-    private const val OVERLAY_DENSITY = 1f
-    private const val OVERLAY_FONT_SCALE = 1.2f
+    private const val OVERLAY_DENSITY = 1.3f
+    private const val OVERLAY_FONT_SCALE = 1.6f
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val lyricState = mutableStateOf<SuperLyricData?>(null)
+    private val lyricRefreshToken = mutableStateOf(0L)
     private val musicSourceState = mutableStateOf<MusicSource?>(null)
     private val musicSourceCache = mutableMapOf<String, MusicSource>()
 
@@ -95,7 +96,11 @@ object LyricOverlayController {
                             fontScale = OVERLAY_FONT_SCALE
                         )
                     ) {
-                        LyricOverlay(lyricState.value, musicSourceState.value)
+                        LyricOverlay(
+                            data = lyricState.value,
+                            source = musicSourceState.value,
+                            refreshToken = lyricRefreshToken.value
+                        )
                     }
                 }
 
@@ -237,6 +242,7 @@ object LyricOverlayController {
                         ?.let(::resolveMusicSource)
                     mainHandler.post {
                         lyricState.value = data
+                        lyricRefreshToken.value += 1L
                         if (source != null) {
                             musicSourceState.value = source
                         }
@@ -263,7 +269,10 @@ object LyricOverlayController {
             try {
                 val latest = SuperLyricHelper.getLatestLyric() ?: return@Thread
                 val resolved = SuperLyricCache.resolve(latest) ?: latest
-                mainHandler.post { lyricState.value = resolved }
+                mainHandler.post {
+                    lyricState.value = resolved
+                    lyricRefreshToken.value += 1L
+                }
             } catch (e: Throwable) {
                 Log.w(TAG, "拉取当前歌词失败: ${e.message}")
             }

@@ -2,7 +2,6 @@ package com.ghhccghk.yadeahook.lyrics
 
 import android.os.SystemClock
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,7 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,9 +47,13 @@ import kotlinx.coroutines.isActive
  * 外层由 ComposeView 渲染成 Bitmap，再合到导航并发送给仪表。
  */
 @Composable
-fun LyricOverlay(data: SuperLyricData?, source: MusicSource?) {
-    val karaokeLine = remember(data) { data?.toKaraokeLine() }
-    val syncedLine = remember(data) { data?.toSyncedLine() }
+fun LyricOverlay(
+    data: SuperLyricData?,
+    source: MusicSource?,
+    refreshToken: Long
+) {
+    val karaokeLine = remember(data, refreshToken) { data?.toKaraokeLine() }
+    val syncedLine = remember(data, refreshToken) { data?.toSyncedLine() }
 
     Box(
         modifier = Modifier
@@ -60,14 +62,7 @@ fun LyricOverlay(data: SuperLyricData?, source: MusicSource?) {
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth(0.94f)
-                .clip(
-                    RoundedCornerShape(
-                        bottomStart = 12.dp,
-                        bottomEnd = 12.dp
-                    )
-                )
-                .background(Color.Black.copy(alpha = 0.42f))
+                .fillMaxWidth()
                 .padding(start = 300.dp, top = 48.dp, end = 24.dp, bottom = 5.dp)
         ) {
             if (source != null) {
@@ -83,7 +78,7 @@ fun LyricOverlay(data: SuperLyricData?, source: MusicSource?) {
                             contentDescription = null,
                             contentScale = ContentScale.Fit,
                             modifier = Modifier
-                                .size(12.dp)
+                                .size(20.dp)
                                 .clip(CircleShape)
                         )
                         Spacer(modifier = Modifier.width(5.dp))
@@ -91,8 +86,8 @@ fun LyricOverlay(data: SuperLyricData?, source: MusicSource?) {
                     Text(
                         text = source.appName,
                         color = Color.White.copy(alpha = 0.82f),
-                        fontSize = 10.sp,
-                        lineHeight = 12.sp,
+                        fontSize = 12.sp,
+                        lineHeight = 14.sp,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -102,7 +97,11 @@ fun LyricOverlay(data: SuperLyricData?, source: MusicSource?) {
             }
 
             if (karaokeLine != null) {
-                val playbackPosition = rememberPlaybackPosition(data, karaokeLine)
+                val playbackPosition = rememberPlaybackPosition(
+                    data = data,
+                    line = karaokeLine,
+                    refreshToken = refreshToken
+                )
                 CompositionLocalProvider(LocalTextStyle provides TranslationTextStyle) {
                     KaraokeLineText(
                         line = karaokeLine,
@@ -145,15 +144,15 @@ fun LyricOverlay(data: SuperLyricData?, source: MusicSource?) {
 
 private val LyricTextStyle = TextStyle(
     color = Color.White,
-    fontSize = 14.sp,
-    lineHeight = 17.sp,
+    fontSize = 15.sp,
+    lineHeight = 20.sp,
     fontWeight = FontWeight.Bold
 )
 
 private val TranslationTextStyle = TextStyle(
     color = Color.White.copy(alpha = 0.68f),
-    fontSize = 9.sp,
-    lineHeight = 11.sp
+    fontSize = 11.sp,
+    lineHeight = 13.sp
 )
 
 private data class PlaybackAnchor(
@@ -169,9 +168,10 @@ private data class PlaybackAnchor(
 @Composable
 private fun rememberPlaybackPosition(
     data: SuperLyricData?,
-    line: KaraokeLine
+    line: KaraokeLine,
+    refreshToken: Long
 ): Int {
-    val anchor = remember(data, line) {
+    val anchor = remember(refreshToken, line) {
         val rawPosition = if (data != null && data.hasPosition()) {
             data.position
         } else {
@@ -184,7 +184,11 @@ private fun rememberPlaybackPosition(
         )
     }
 
-    val position by produceState(initialValue = anchor.positionMs, anchor) {
+    val position by produceState(
+        initialValue = anchor.positionMs,
+        anchor,
+        refreshToken
+    ) {
         if (anchor.positionMs >= anchor.endMs) {
             value = anchor.endMs
             return@produceState
