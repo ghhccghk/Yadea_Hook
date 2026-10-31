@@ -100,6 +100,10 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         
         Spacer(modifier = Modifier.height(24.dp))
 
+        LyricOverlaySettingsSection(modifier = Modifier.fillMaxWidth())
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         // ============ 功能开关 ============
         Card(
             modifier = Modifier.fillMaxWidth(),
