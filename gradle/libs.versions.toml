@@ -17,6 +17,7 @@ superLyricApi = "3.7"
 lyricsUi = "1.0.19"
 lyricsCore = "0.4.5"
 hiddenApiBypass = "6.1"
+meowui = "0.1.5"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -45,6 +46,7 @@ superlyricapi = { module = "com.github.HChenX:SuperLyricApi", version.ref = "sup
 lyrics-ui = { module = "com.mocharealm.accompanist:lyrics-ui", version.ref = "lyricsUi" }
 lyrics-core = { module = "com.mocharealm.accompanist:lyrics-core", version.ref = "lyricsCore" }
 hiddenapibypass = { module = "org.lsposed.hiddenapibypass:hiddenapibypass", version.ref = "hiddenApiBypass" }
+meowui-xposed = { module = "io.github.lingqiqi5211.meowui:meowui-xposed", version.ref = "meowui" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

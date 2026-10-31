@@ -67,6 +67,7 @@ dependencies {
     implementation(libs.lyrics.ui)
     implementation(libs.lyrics.core)
     implementation(libs.hiddenapibypass)
+    implementation(libs.meowui.xposed)
 
     // 如果你的模块直接使用 Xposed / libxposed 的类型，
     // 还需要额外声明对应运行时 API。
