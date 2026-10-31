@@ -66,6 +66,13 @@ dependencies {
     implementation(libs.superlyricapi)
     implementation(libs.lyrics.ui)
     implementation(libs.lyrics.core)
+    // lyrics-ui 1.0.19 is compiled against lyrics-core 0.4.5. Newer core releases
+    // change KaraokeSyllable's generated copy$default ABI and crash KaraokeLineText.
+    implementation("com.mocharealm.accompanist:lyrics-core:0.4.5") {
+        version {
+            strictly("0.4.5")
+        }
+    }
     implementation(libs.hiddenapibypass)
     implementation(libs.meowui.xposed)
 
