@@ -97,7 +97,7 @@ MainHook → VehicleServiceLoad.initHooks(context)
 - 没有逐字数据、words 为空或时间无效时，使用 `SyncedLineText`。
 - 不使用仓库内的简化手绘歌词行；布局与逐字渲染以依赖中的 Accompanist Lyrics 组件为准。
 - `KaraokeLineText` 的 `currentTimeProvider` 只在 Canvas 绘制回调中读取，不会凭自身触发重组；逐字行必须用 `key(playbackPosition, refreshToken)` 显式重建组合，缺少逐字数据的 `SyncedLineText` 不需要逐帧重建。
-- SuperLyric 只在切行时下发增量包，`LyricOverlayUi.kt` 以当前 `SuperLyricData.position` 为锚点，结合 `SystemClock.elapsedRealtime()` 每 33ms 插值行内进度；每次 `onLyric` 刷新都递增独立 token，强制重置行内进度。
+- SuperLyric 只在切行时下发增量包，`LyricOverlayUi.kt` 以当前 `SuperLyricData.position` 为锚点，结合 `SystemClock.elapsedRealtime()` 按设置中的 `5–60 FPS`（默认 `30 FPS`，即约 33ms）插值行内进度；每次 `onLyric` 刷新都递增独立 token，强制重置行内进度。
 - 翻译和来源行仍在同一顶部歌词条内；来源显示为图标在左、应用名在右。
 - 歌词配色跟随目标 App 当前导航 Activity 的 `resources.configuration.uiMode`，不要使用系统 `isSystemInDarkTheme()`；原 App 的夜间模式可在 AppCompat 中手动切换，`LyricOverlayController` 在挂载和每次投屏绘制时同步主题状态。
 - 深色模式主歌词使用白色，浅色模式使用 `0xFF121212`；翻译、来源名、暂无歌词和逐字高亮都使用同一主题主色及其透明度。

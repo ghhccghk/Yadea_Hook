@@ -11,6 +11,7 @@ data class OverlaySettings(
     val end: Float = OverlaySettingSpecs.end.defaultValue,
     val backgroundAlpha: Float = OverlaySettingSpecs.backgroundAlpha.defaultValue,
     val widthRatio: Float = OverlaySettingSpecs.widthRatio.defaultValue,
+    val frameRate: Float = OverlaySettingSpecs.frameRate.defaultValue,
 )
 
 data class BooleanSettingSpec(
@@ -61,4 +62,7 @@ object OverlaySettingSpecs {
 
     /** Fraction of the post-padding content width. 1 preserves fillMaxWidth behavior. */
     val widthRatio = FloatSettingSpec(1f, minimum = 0.5f, maximum = 1f)
+
+    /** Maximum per-word lyric recomposition rate in frames per second. */
+    val frameRate = FloatSettingSpec(30f, minimum = 5f, maximum = 60f)
 }

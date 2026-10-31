@@ -16,6 +16,7 @@ object YadeaSettingsKeys {
     const val OVERLAY_END = "overlay_end"
     const val OVERLAY_BACKGROUND_ALPHA = "overlay_background_alpha"
     const val OVERLAY_WIDTH_RATIO = "overlay_width_ratio"
+    const val OVERLAY_FRAME_RATE = "overlay_frame_rate"
 
     val overlayEnabled = PreferenceKey.boolean(
         OVERLAY_ENABLED,
@@ -56,5 +57,9 @@ object YadeaSettingsKeys {
     val overlayWidthRatio = PreferenceKey.float(
         OVERLAY_WIDTH_RATIO,
         OverlaySettingSpecs.widthRatio.defaultValue,
+    )
+    val overlayFrameRate = PreferenceKey.float(
+        OVERLAY_FRAME_RATE,
+        OverlaySettingSpecs.frameRate.defaultValue,
     )
 }

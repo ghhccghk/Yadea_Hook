@@ -24,13 +24,13 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.ghhccghk.yadeahook.settings.OverlaySettings
+import com.ghhccghk.yadeahook.settings.YadeaSettingsKeys
+import com.ghhccghk.yadeahook.settings.YadeaSettingsRepository
 import com.hchen.superlyricapi.ISuperLyricReceiver
 import com.hchen.superlyricapi.SuperLyricCache
 import com.hchen.superlyricapi.SuperLyricData
 import com.hchen.superlyricapi.SuperLyricHelper
-import com.ghhccghk.yadeahook.settings.OverlaySettings
-import com.ghhccghk.yadeahook.settings.YadeaSettingsKeys
-import com.ghhccghk.yadeahook.settings.YadeaSettingsRepository
 import io.github.libxposed.api.XposedModule
 import io.github.lingqiqi5211.meowui.libxposed.XposedModulePreferenceStore
 import io.github.lingqiqi5211.meowui.libxposed.createPreferenceStore
@@ -40,7 +40,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import org.lsposed.hiddenapibypass.HiddenApiBypass
@@ -124,7 +123,8 @@ object LyricOverlayController {
                                     "top=${settings.top}, start=${settings.start}, " +
                                     "end=${settings.end}, " +
                                     "backgroundAlpha=${settings.backgroundAlpha}, " +
-                                    "widthRatio=${settings.widthRatio}"
+                                    "widthRatio=${settings.widthRatio}, " +
+                                    "frameRate=${settings.frameRate}"
                             )
                         }
                 } catch (cause: CancellationException) {

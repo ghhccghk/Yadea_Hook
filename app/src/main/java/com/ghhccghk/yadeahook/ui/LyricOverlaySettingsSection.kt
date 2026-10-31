@@ -143,6 +143,13 @@ fun LyricOverlaySettingsSection(modifier: Modifier = Modifier) {
                         valueRange = OverlaySettingSpecs.backgroundAlpha.range,
                         valueText = ::formatPercent,
                     )
+                    MeowSliderPreference(
+                        key = YadeaSettingsKeys.overlayFrameRate,
+                        title = "歌词刷新率",
+                        summary = "逐字歌词行内进度的更新上限，默认 30 FPS",
+                        valueRange = OverlaySettingSpecs.frameRate.range,
+                        valueText = ::formatFrameRate,
+                    )
                 }
             }
         }
@@ -202,3 +209,5 @@ private fun formatMultiplier(value: Float): String = String.format("%.2f×", val
 private fun formatDp(value: Float): String = "${value.toInt()} dp"
 
 private fun formatPercent(value: Float): String = "${(value * 100).toInt()}%"
+
+private fun formatFrameRate(value: Float): String = "${value.toInt()} FPS"

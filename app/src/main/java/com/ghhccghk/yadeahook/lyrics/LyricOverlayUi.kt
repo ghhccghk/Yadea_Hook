@@ -21,10 +21,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
@@ -128,7 +129,8 @@ fun LyricOverlay(
                 val playbackPosition = rememberPlaybackPosition(
                     data = data,
                     line = karaokeLine,
-                    refreshToken = refreshToken
+                    refreshToken = refreshToken,
+                    frameRate = settings.frameRate,
                 )
                 CompositionLocalProvider(LocalTextStyle provides translationTextStyle) {
                     // KaraokeLineText 只在绘制回调里读取时间，自身没有进度 State。
@@ -200,8 +202,10 @@ private data class PlaybackAnchor(
 private fun rememberPlaybackPosition(
     data: SuperLyricData?,
     line: KaraokeLine,
-    refreshToken: Long
+    refreshToken: Long,
+    frameRate: Float,
 ): Int {
+    val currentFrameRate by rememberUpdatedState(frameRate)
     val anchor = remember(refreshToken, line) {
         val rawPosition = if (data != null && data.hasPosition()) {
             data.position
@@ -218,7 +222,7 @@ private fun rememberPlaybackPosition(
     val position by produceState(
         initialValue = anchor.positionMs,
         anchor,
-        refreshToken
+        refreshToken,
     ) {
         if (anchor.positionMs >= anchor.endMs) {
             value = anchor.endMs
@@ -230,11 +234,15 @@ private fun rememberPlaybackPosition(
             val next = anchor.positionMs + elapsed.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
             value = next.coerceAtMost(anchor.endMs)
             if (next >= anchor.endMs) break
-            delay(33L)
+            val frameIntervalMs = calculateFrameIntervalMs(currentFrameRate)
+            delay(frameIntervalMs)
         }
     }
     return position
 }
+
+internal fun calculateFrameIntervalMs(frameRate: Float): Long =
+    ((1000.0 / frameRate.coerceIn(5f, 60f)).toLong()).coerceAtLeast(1L)
 
 /**
  * 将 SuperLyricApi 的逐字时间转换为 Accompanist Lyrics 的 KaraokeLine。

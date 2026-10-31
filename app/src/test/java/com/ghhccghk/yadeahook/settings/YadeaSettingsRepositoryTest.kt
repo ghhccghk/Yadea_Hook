@@ -30,6 +30,7 @@ class YadeaSettingsRepositoryTest {
         assertEquals(true, YadeaSettingsKeys.overlayEnabled.defaultValue)
         assertEquals(1.3f, YadeaSettingsKeys.overlayDensity.defaultValue)
         assertEquals(1.6f, YadeaSettingsKeys.overlayFontScale.defaultValue)
+        assertEquals(30f, YadeaSettingsKeys.overlayFrameRate.defaultValue)
     }
 
     @Test
@@ -50,11 +51,13 @@ class YadeaSettingsRepositoryTest {
         val store = InMemoryPreferenceStore()
         store.write(YadeaSettingsKeys.overlayDensity, 99f)
         store.write(YadeaSettingsKeys.overlayWidthRatio, Float.NaN)
+        store.write(YadeaSettingsKeys.overlayFrameRate, 1f)
 
         val settings = YadeaSettingsRepository(store).readOverlaySettings()
 
         assertEquals(2f, settings.density)
         assertEquals(1f, settings.widthRatio)
+        assertEquals(5f, settings.frameRate)
     }
 
     @Test
@@ -63,9 +66,12 @@ class YadeaSettingsRepositoryTest {
         val repository = YadeaSettingsRepository(store)
 
         val result = repository.write(YadeaSettingsKeys.overlayStart, -20f)
+        val frameRateResult = repository.write(YadeaSettingsKeys.overlayFrameRate, 90f)
 
         assertEquals(PreferenceWriteResult.Success, result)
         assertEquals(0f, store.read(YadeaSettingsKeys.overlayStart))
+        assertEquals(PreferenceWriteResult.Success, frameRateResult)
+        assertEquals(60f, store.read(YadeaSettingsKeys.overlayFrameRate))
     }
 
     @Test

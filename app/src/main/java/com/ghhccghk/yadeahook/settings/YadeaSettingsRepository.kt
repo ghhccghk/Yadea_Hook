@@ -36,6 +36,7 @@ class YadeaSettingsRepository(
             OverlaySettingSpecs.backgroundAlpha,
         ),
         widthRatio = readFloat(YadeaSettingsKeys.overlayWidthRatio, OverlaySettingSpecs.widthRatio),
+        frameRate = readFloat(YadeaSettingsKeys.overlayFrameRate, OverlaySettingSpecs.frameRate),
     )
 
     fun observeOverlaySettings(): Flow<OverlaySettings> {
@@ -71,12 +72,17 @@ class YadeaSettingsRepository(
         ) { backgroundAlpha, widthRatio ->
             AppearanceSettings(backgroundAlpha, widthRatio)
         }
+        val frameRate = observeFloat(
+            YadeaSettingsKeys.overlayFrameRate,
+            OverlaySettingSpecs.frameRate,
+        )
 
-        return combine(flags, typography, horizontalInsets, appearance) {
+        return combine(flags, typography, horizontalInsets, appearance, frameRate) {
                 booleanSettings,
                 typographySettings,
                 insets,
                 appearanceSettings,
+                lyricFrameRate,
             ->
             OverlaySettings(
                 enabled = booleanSettings.enabled,
@@ -89,6 +95,7 @@ class YadeaSettingsRepository(
                 end = insets.end,
                 backgroundAlpha = appearanceSettings.backgroundAlpha,
                 widthRatio = appearanceSettings.widthRatio,
+                frameRate = lyricFrameRate,
             )
         }
     }
@@ -162,6 +169,7 @@ class YadeaSettingsRepository(
         YadeaSettingsKeys.OVERLAY_END -> OverlaySettingSpecs.end
         YadeaSettingsKeys.OVERLAY_BACKGROUND_ALPHA -> OverlaySettingSpecs.backgroundAlpha
         YadeaSettingsKeys.OVERLAY_WIDTH_RATIO -> OverlaySettingSpecs.widthRatio
+        YadeaSettingsKeys.OVERLAY_FRAME_RATE -> OverlaySettingSpecs.frameRate
         else -> null
     }
 
