@@ -31,68 +31,80 @@ class YadeaSettingsRepositoryTest {
     }
 
     @Test
-    fun sharedKeysMatchTheirNamesTypesAndDefaults() {
+    fun sharedKeysHaveUniqueNamesMatchingTheirTypesAndDefaults() {
+        val names = mutableSetOf<String>()
         assertKey(
+            names,
             YadeaSettingsKeys.overlayEnabled,
             YadeaSettingsKeys.OVERLAY_ENABLED,
             PreferenceType.Boolean,
             OverlaySettingSpecs.enabled.defaultValue,
         )
         assertKey(
+            names,
             YadeaSettingsKeys.overlayShowSource,
             YadeaSettingsKeys.OVERLAY_SHOW_SOURCE,
             PreferenceType.Boolean,
             OverlaySettingSpecs.showSource.defaultValue,
         )
         assertKey(
+            names,
             YadeaSettingsKeys.overlayShowTranslation,
             YadeaSettingsKeys.OVERLAY_SHOW_TRANSLATION,
             PreferenceType.Boolean,
             OverlaySettingSpecs.showTranslation.defaultValue,
         )
         assertKey(
+            names,
             YadeaSettingsKeys.overlayDensity,
             YadeaSettingsKeys.OVERLAY_DENSITY,
             PreferenceType.Float,
             OverlaySettingSpecs.density.defaultValue,
         )
         assertKey(
+            names,
             YadeaSettingsKeys.overlayFontScale,
             YadeaSettingsKeys.OVERLAY_FONT_SCALE,
             PreferenceType.Float,
             OverlaySettingSpecs.fontScale.defaultValue,
         )
         assertKey(
+            names,
             YadeaSettingsKeys.overlayTop,
             YadeaSettingsKeys.OVERLAY_TOP,
             PreferenceType.Float,
             OverlaySettingSpecs.top.defaultValue,
         )
         assertKey(
+            names,
             YadeaSettingsKeys.overlayStart,
             YadeaSettingsKeys.OVERLAY_START,
             PreferenceType.Float,
             OverlaySettingSpecs.start.defaultValue,
         )
         assertKey(
+            names,
             YadeaSettingsKeys.overlayEnd,
             YadeaSettingsKeys.OVERLAY_END,
             PreferenceType.Float,
             OverlaySettingSpecs.end.defaultValue,
         )
         assertKey(
+            names,
             YadeaSettingsKeys.overlayBackgroundAlpha,
             YadeaSettingsKeys.OVERLAY_BACKGROUND_ALPHA,
             PreferenceType.Float,
             OverlaySettingSpecs.backgroundAlpha.defaultValue,
         )
         assertKey(
+            names,
             YadeaSettingsKeys.overlayWidthRatio,
             YadeaSettingsKeys.OVERLAY_WIDTH_RATIO,
             PreferenceType.Float,
             OverlaySettingSpecs.widthRatio.defaultValue,
         )
         assertKey(
+            names,
             YadeaSettingsKeys.overlayFrameRate,
             YadeaSettingsKeys.OVERLAY_FRAME_RATE,
             PreferenceType.Float,
@@ -134,11 +146,14 @@ class YadeaSettingsRepositoryTest {
 
         val result = repository.write(YadeaSettingsKeys.overlayStart, -20f)
         val frameRateResult = repository.write(YadeaSettingsKeys.overlayFrameRate, 90f)
+        val nonFiniteResult = repository.write(YadeaSettingsKeys.overlayDensity, Float.NaN)
 
         assertEquals(PreferenceWriteResult.Success, result)
         assertEquals(0f, store.read(YadeaSettingsKeys.overlayStart))
         assertEquals(PreferenceWriteResult.Success, frameRateResult)
         assertEquals(60f, store.read(YadeaSettingsKeys.overlayFrameRate))
+        assertEquals(PreferenceWriteResult.Success, nonFiniteResult)
+        assertEquals(1.3f, store.read(YadeaSettingsKeys.overlayDensity))
     }
 
     @Test
@@ -146,6 +161,13 @@ class YadeaSettingsRepositoryTest {
         val repository = YadeaSettingsRepository(FailingReadStore())
 
         assertEquals(OverlaySettings(), repository.readOverlaySettings())
+    }
+
+    @Test
+    fun observationFailuresFallBackToSharedDefaults() = runBlocking {
+        val repository = YadeaSettingsRepository(FailingReadStore())
+
+        assertEquals(OverlaySettings(), repository.observeOverlaySettings().first())
     }
 
     @Test
@@ -208,11 +230,13 @@ class YadeaSettingsRepositoryTest {
     }
 
     private fun <T : Any> assertKey(
+        names: MutableSet<String>,
         key: PreferenceKey<T>,
         expectedName: String,
         expectedType: PreferenceType<T>,
         expectedDefault: T,
     ) {
+        assertTrue("Duplicate key name: $expectedName", names.add(expectedName))
         assertEquals(expectedName, key.name)
         assertEquals(expectedType, key.type)
         assertEquals(expectedDefault, key.defaultValue)
