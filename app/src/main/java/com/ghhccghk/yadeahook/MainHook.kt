@@ -38,8 +38,13 @@ class MainHook : XposedModule() {
         EzXposed.initOnPackageReady(param)
     }
 
-    override fun onHotReloading(param: HotReloadingParam): Boolean =
-        EzXposed.handleHotReloading(param)
+    override fun onHotReloading(param: HotReloadingParam): Boolean {
+        val accepted = EzXposed.handleHotReloading(param)
+        if (accepted) {
+            VehicleServiceLoad.shutdown()
+        }
+        return accepted
+    }
 
     override fun onHotReloaded(param: HotReloadedParam) {
         EzXposed.handleHotReloadedWithTargetReady(this, param, { initHooks() })
@@ -54,12 +59,12 @@ class MainHook : XposedModule() {
             }.createHook {
                 after { param ->
                     val context = param.args[0] as Context
-                    VehicleServiceLoad.initHooks(context)
+                    VehicleServiceLoad.initHooks(context, this@MainHook)
                 }
             }
         } ?: run {
             // 没有加固壳，直接初始化
-            VehicleServiceLoad.initHooks(context = appContext)
+            VehicleServiceLoad.initHooks(context = appContext, module = this)
         }
     }
 }

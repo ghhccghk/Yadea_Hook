@@ -28,6 +28,21 @@ import com.hchen.superlyricapi.ISuperLyricReceiver
 import com.hchen.superlyricapi.SuperLyricCache
 import com.hchen.superlyricapi.SuperLyricData
 import com.hchen.superlyricapi.SuperLyricHelper
+import com.ghhccghk.yadeahook.settings.OverlaySettings
+import com.ghhccghk.yadeahook.settings.YadeaSettingsKeys
+import com.ghhccghk.yadeahook.settings.YadeaSettingsRepository
+import io.github.libxposed.api.XposedModule
+import io.github.lingqiqi5211.meowui.libxposed.XposedModulePreferenceStore
+import io.github.lingqiqi5211.meowui.libxposed.createPreferenceStore
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 import java.lang.ref.WeakReference
 import kotlin.math.roundToInt
@@ -40,14 +55,13 @@ import kotlin.math.roundToInt
  */
 object LyricOverlayController {
     private const val TAG = "YadeaHook-Lyric"
-    private const val OVERLAY_DENSITY = 1.3f
-    private const val OVERLAY_FONT_SCALE = 1.6f
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val lyricState = mutableStateOf<SuperLyricData?>(null)
     private val lyricRefreshToken = mutableStateOf(0L)
     private val musicSourceState = mutableStateOf<MusicSource?>(null)
     private val darkThemeState = mutableStateOf(false)
+    private val overlaySettingsState = mutableStateOf(OverlaySettings())
     private val musicSourceCache = mutableMapOf<String, MusicSource>()
 
     private var appContext: Context? = null
@@ -58,15 +72,90 @@ object LyricOverlayController {
     private var firstDrawLogged = false
     private var canvasWidth = 0
     private var canvasHeight = 0
+    private var settingsScope: CoroutineScope? = null
+    private var settingsJob: Job? = null
+    private var settingsStore: XposedModulePreferenceStore? = null
+    private var settingsGeneration = 0L
 
-    fun init(context: Context) {
+    fun init(context: Context, module: XposedModule) {
         appContext = context.applicationContext
+        initOverlaySettings(module)
         ensureHiddenApiBypass()
         ensureReceiver()
     }
 
     fun hasOverlay(): Boolean = composeView != null
 
+    /** Releases resources whose lifetime is owned by the module generation. */
+    fun shutdown() {
+        detach()
+        stopOverlaySettings()
+    }
+
+    @Synchronized
+    private fun initOverlaySettings(module: XposedModule) {
+        stopOverlaySettings()
+        overlaySettingsState.value = OverlaySettings()
+        val generation = settingsGeneration
+
+        try {
+            val store = module.createPreferenceStore(YadeaSettingsKeys.PREFERENCE_NAME)
+            val repository = YadeaSettingsRepository(store)
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+            settingsStore = store
+            settingsScope = scope
+            settingsJob = scope.launch {
+                try {
+                    repository.observeOverlaySettings()
+                        .distinctUntilChanged()
+                        .collect { settings ->
+                            if (generation != settingsGeneration || settingsStore !== store) {
+                                return@collect
+                            }
+                            overlaySettingsState.value = settings
+                            Log.d(
+                                TAG,
+                                "overlay settings: enabled=${settings.enabled}, " +
+                                    "source=${settings.showSource}, " +
+                                    "translation=${settings.showTranslation}, " +
+                                    "density=${settings.density}, " +
+                                    "fontScale=${settings.fontScale}, " +
+                                    "top=${settings.top}, start=${settings.start}, " +
+                                    "end=${settings.end}, " +
+                                    "backgroundAlpha=${settings.backgroundAlpha}, " +
+                                    "widthRatio=${settings.widthRatio}"
+                            )
+                        }
+                } catch (cause: CancellationException) {
+                    throw cause
+                } catch (cause: Throwable) {
+                    if (generation == settingsGeneration) {
+                        overlaySettingsState.value = OverlaySettings()
+                    }
+                    Log.e(TAG, "监听远程歌词设置失败，回退默认值", cause)
+                }
+            }
+        } catch (cause: Throwable) {
+            Log.e(TAG, "创建远程歌词设置存储失败，回退默认值", cause)
+            stopOverlaySettings()
+        }
+    }
+
+    @Synchronized
+    private fun stopOverlaySettings() {
+        settingsGeneration += 1
+        settingsJob?.cancel()
+        settingsJob = null
+        settingsScope?.cancel()
+        settingsScope = null
+        try {
+            settingsStore?.close()
+        } catch (cause: Throwable) {
+            Log.w(TAG, "关闭远程歌词设置存储失败", cause)
+        }
+        settingsStore = null
+    }
     fun attach(activity: Activity) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
             Log.w(TAG, "Android 10 以下跳过 Compose 歌词条")
@@ -93,17 +182,19 @@ object LyricOverlayController {
                 setViewTreeSavedStateRegistryOwner(savedStateOwner)
                 setViewTreeViewModelStoreOwner(viewModelStoreOwner)
                 setContent {
+                    val overlaySettings = overlaySettingsState.value
                     CompositionLocalProvider(
                         LocalDensity provides Density(
-                            density = OVERLAY_DENSITY,
-                            fontScale = OVERLAY_FONT_SCALE
+                            density = overlaySettings.density,
+                            fontScale = overlaySettings.fontScale
                         )
                     ) {
                         LyricOverlay(
                             data = lyricState.value,
                             source = musicSourceState.value,
                             refreshToken = lyricRefreshToken.value,
-                            isDarkTheme = darkThemeState.value
+                            isDarkTheme = darkThemeState.value,
+                            settings = overlaySettings
                         )
                     }
                 }
@@ -164,6 +255,7 @@ object LyricOverlayController {
      * 把歌词条画到仪表位图顶部。按目标位图宽度缩放 ComposeView。
      */
     fun draw(canvas: Canvas, target: Bitmap) {
+        if (!overlaySettingsState.value.enabled) return
         val view = composeView ?: return
         if (view.width <= 0 || view.height <= 0) return
 

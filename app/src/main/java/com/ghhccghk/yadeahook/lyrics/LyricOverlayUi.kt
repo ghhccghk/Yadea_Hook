@@ -23,6 +23,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -32,6 +33,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ghhccghk.yadeahook.settings.OverlaySettings
 import com.hchen.superlyricapi.SuperLyricData
 import com.hchen.superlyricapi.SuperLyricWord
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeAlignment
@@ -53,7 +55,8 @@ fun LyricOverlay(
     data: SuperLyricData?,
     source: MusicSource?,
     refreshToken: Long,
-    isDarkTheme: Boolean
+    isDarkTheme: Boolean,
+    settings: OverlaySettings,
 ) {
     val karaokeLine = remember(data, refreshToken) { data?.toKaraokeLine() }
     val syncedLine = remember(data, refreshToken) { data?.toSyncedLine() }
@@ -74,9 +77,23 @@ fun LyricOverlay(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 300.dp, top = 42.dp, end = 30.dp, bottom = 5.dp)
+                .padding(
+                    start = settings.start.dp,
+                    top = settings.top.dp,
+                    end = settings.end.dp,
+                    bottom = 5.dp
+                )
+                .fillMaxWidth(settings.widthRatio)
+                .drawBehind {
+                    if (settings.backgroundAlpha > 0f) {
+                        drawRect(
+                            color = primaryColor.copy(alpha = settings.backgroundAlpha),
+                            size = size
+                        )
+                    }
+                }
         ) {
-            if (source != null) {
+            if (settings.showSource && source != null) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
@@ -127,7 +144,7 @@ fun LyricOverlay(
                             accompanimentLineTextStyle = lyricTextStyle,
                             phoneticTextStyle = translationTextStyle,
                             activeColor = primaryColor,
-                            showTranslation = true,
+                            showTranslation = settings.showTranslation,
                             showPhonetic = false,
                             textMeasurer = textMeasurer
                         )
@@ -142,7 +159,7 @@ fun LyricOverlay(
                         textStyle = lyricTextStyle,
                         textColor = primaryColor,
                         modifier = Modifier.padding(top = 1.dp),
-                        showTranslation = true
+                        showTranslation = settings.showTranslation
                     )
                 }
             } else {

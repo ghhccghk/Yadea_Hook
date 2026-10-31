@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.IntentFilter
 import android.util.Log
 import androidx.core.content.ContextCompat
+import io.github.libxposed.api.XposedModule
 import com.ghhccghk.yadeahook.hooks.BleAuthCaptureHook
 import com.ghhccghk.yadeahook.hooks.BleConnectStateHook
 import com.ghhccghk.yadeahook.hooks.CredentialExtractHook
@@ -26,7 +27,7 @@ object VehicleServiceLoad {
     internal var classLoader: ClassLoader? = null
         private set
 
-    fun initHooks(context: Context) {
+    fun initHooks(context: Context, module: XposedModule) {
         if (context.packageName != TARGET_PACKAGE) {
             Log.w(TAG, "拒绝非目标包初始化: ${context.packageName}")
             return
@@ -56,7 +57,7 @@ object VehicleServiceLoad {
             CredentialExtractHook(),
             LoginCaptureHook(),
             SpeedAlertHook(),
-            NaviLyricHook(),
+            NaviLyricHook(module),
             NaviScreenCaptureHook()
         )
 
@@ -80,6 +81,15 @@ object VehicleServiceLoad {
             Log.d(TAG, "StatusUpdateReceiver 已注册")
         } catch (e: Throwable) {
             Log.e(TAG, "StatusUpdateReceiver 注册失败", e)
+        }
+    }
+
+    /** Stops resources that belong to the current module generation. */
+    fun shutdown() {
+        try {
+            NaviLyricHook.shutdown()
+        } catch (cause: Throwable) {
+            Log.w(TAG, "停止歌词设置资源失败", cause)
         }
     }
 

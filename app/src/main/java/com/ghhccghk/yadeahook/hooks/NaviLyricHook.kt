@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import com.ghhccghk.yadeahook.BaseHook
 import com.ghhccghk.yadeahook.lyrics.LyricOverlayController
+import io.github.libxposed.api.XposedModule
 import io.github.lingqiqi5211.ezhooktool.core.findMethod
 import io.github.lingqiqi5211.ezhooktool.core.loadClassOrNull
 import io.github.lingqiqi5211.ezhooktool.xposed.dsl.createHook
@@ -11,10 +12,18 @@ import io.github.lingqiqi5211.ezhooktool.xposed.dsl.createHook
 /**
  * 在百度/高德共用的导航 Activity 上挂载 Compose 歌词条。
  */
-class NaviLyricHook : BaseHook() {
+class NaviLyricHook(
+    private val module: XposedModule,
+) : BaseHook() {
+    companion object {
+        fun shutdown() {
+            LyricOverlayController.shutdown()
+        }
+    }
+
     override fun init(classLoader: ClassLoader, context: Context) {
         appContext = context
-        LyricOverlayController.init(context)
+        LyricOverlayController.init(context, module)
 
         val activityClass = loadClassOrNull(
             "com.yadea.amap.view.RoutePlanningNavigationBaiduActivity",
