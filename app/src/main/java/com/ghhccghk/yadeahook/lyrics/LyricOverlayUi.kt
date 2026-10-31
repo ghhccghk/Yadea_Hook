@@ -34,6 +34,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ghhccghk.yadeahook.settings.OverlaySettingSpecs
 import com.ghhccghk.yadeahook.settings.OverlaySettings
 import com.hchen.superlyricapi.SuperLyricData
 import com.hchen.superlyricapi.SuperLyricWord
@@ -241,8 +242,17 @@ private fun rememberPlaybackPosition(
     return position
 }
 
-internal fun calculateFrameIntervalMs(frameRate: Float): Long =
-    ((1000.0 / frameRate.coerceIn(5f, 60f)).toLong()).coerceAtLeast(1L)
+internal fun calculateFrameIntervalMs(frameRate: Float): Long {
+    val normalizedFrameRate = if (frameRate.isFinite()) {
+        frameRate.coerceIn(
+            OverlaySettingSpecs.frameRate.minimum,
+            OverlaySettingSpecs.frameRate.maximum,
+        )
+    } else {
+        OverlaySettingSpecs.frameRate.defaultValue
+    }
+    return (1000.0 / normalizedFrameRate).toLong().coerceAtLeast(1L)
+}
 
 /**
  * 将 SuperLyricApi 的逐字时间转换为 Accompanist Lyrics 的 KaraokeLine。
