@@ -4,6 +4,7 @@ import io.github.lingqiqi5211.meowui.core.preference.InMemoryPreferenceStore
 import io.github.lingqiqi5211.meowui.core.preference.PreferenceConnectionState
 import io.github.lingqiqi5211.meowui.core.preference.PreferenceKey
 import io.github.lingqiqi5211.meowui.core.preference.PreferenceStore
+import io.github.lingqiqi5211.meowui.core.preference.PreferenceType
 import io.github.lingqiqi5211.meowui.core.preference.PreferenceWriteResult
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
@@ -27,10 +28,76 @@ class YadeaSettingsRepositoryTest {
 
         assertEquals(OverlaySettings(), repository.readOverlaySettings())
         assertEquals("yadeahook_settings", YadeaSettingsKeys.PREFERENCE_NAME)
-        assertEquals(true, YadeaSettingsKeys.overlayEnabled.defaultValue)
-        assertEquals(1.3f, YadeaSettingsKeys.overlayDensity.defaultValue)
-        assertEquals(1.6f, YadeaSettingsKeys.overlayFontScale.defaultValue)
-        assertEquals(30f, YadeaSettingsKeys.overlayFrameRate.defaultValue)
+    }
+
+    @Test
+    fun sharedKeysMatchTheirNamesTypesAndDefaults() {
+        assertKey(
+            YadeaSettingsKeys.overlayEnabled,
+            YadeaSettingsKeys.OVERLAY_ENABLED,
+            PreferenceType.Boolean,
+            OverlaySettingSpecs.enabled.defaultValue,
+        )
+        assertKey(
+            YadeaSettingsKeys.overlayShowSource,
+            YadeaSettingsKeys.OVERLAY_SHOW_SOURCE,
+            PreferenceType.Boolean,
+            OverlaySettingSpecs.showSource.defaultValue,
+        )
+        assertKey(
+            YadeaSettingsKeys.overlayShowTranslation,
+            YadeaSettingsKeys.OVERLAY_SHOW_TRANSLATION,
+            PreferenceType.Boolean,
+            OverlaySettingSpecs.showTranslation.defaultValue,
+        )
+        assertKey(
+            YadeaSettingsKeys.overlayDensity,
+            YadeaSettingsKeys.OVERLAY_DENSITY,
+            PreferenceType.Float,
+            OverlaySettingSpecs.density.defaultValue,
+        )
+        assertKey(
+            YadeaSettingsKeys.overlayFontScale,
+            YadeaSettingsKeys.OVERLAY_FONT_SCALE,
+            PreferenceType.Float,
+            OverlaySettingSpecs.fontScale.defaultValue,
+        )
+        assertKey(
+            YadeaSettingsKeys.overlayTop,
+            YadeaSettingsKeys.OVERLAY_TOP,
+            PreferenceType.Float,
+            OverlaySettingSpecs.top.defaultValue,
+        )
+        assertKey(
+            YadeaSettingsKeys.overlayStart,
+            YadeaSettingsKeys.OVERLAY_START,
+            PreferenceType.Float,
+            OverlaySettingSpecs.start.defaultValue,
+        )
+        assertKey(
+            YadeaSettingsKeys.overlayEnd,
+            YadeaSettingsKeys.OVERLAY_END,
+            PreferenceType.Float,
+            OverlaySettingSpecs.end.defaultValue,
+        )
+        assertKey(
+            YadeaSettingsKeys.overlayBackgroundAlpha,
+            YadeaSettingsKeys.OVERLAY_BACKGROUND_ALPHA,
+            PreferenceType.Float,
+            OverlaySettingSpecs.backgroundAlpha.defaultValue,
+        )
+        assertKey(
+            YadeaSettingsKeys.overlayWidthRatio,
+            YadeaSettingsKeys.OVERLAY_WIDTH_RATIO,
+            PreferenceType.Float,
+            OverlaySettingSpecs.widthRatio.defaultValue,
+        )
+        assertKey(
+            YadeaSettingsKeys.overlayFrameRate,
+            YadeaSettingsKeys.OVERLAY_FRAME_RATE,
+            PreferenceType.Float,
+            OverlaySettingSpecs.frameRate.defaultValue,
+        )
     }
 
     @Test
@@ -93,6 +160,18 @@ class YadeaSettingsRepositoryTest {
     }
 
     @Test
+    fun notConnectedWriteResultIsPreserved() = runBlocking {
+        val disconnected = PreferenceConnectionState.Disconnected(IOException("service died"))
+        val repository = YadeaSettingsRepository(
+            InMemoryPreferenceStore(initialConnectionState = disconnected),
+        )
+
+        val result = repository.write(YadeaSettingsKeys.overlayEnabled, false)
+
+        assertEquals(PreferenceWriteResult.NotConnected(disconnected), result)
+    }
+
+    @Test
     fun observationStopsAllRemoteListenersWhenCancelled() = runBlocking {
         val store = TrackingStore()
         val repository = YadeaSettingsRepository(store)
@@ -112,6 +191,31 @@ class YadeaSettingsRepositoryTest {
         store.write(YadeaSettingsKeys.overlayTop, 500f)
 
         assertEquals(200f, observed.first().top)
+    }
+
+    @Test
+    fun observerPreservesFalseAndZeroValues() = runBlocking {
+        val store = InMemoryPreferenceStore()
+        val repository = YadeaSettingsRepository(store)
+
+        store.write(YadeaSettingsKeys.overlayEnabled, false)
+        store.write(YadeaSettingsKeys.overlayBackgroundAlpha, 0f)
+
+        val settings = repository.observeOverlaySettings().first()
+
+        assertFalse(settings.enabled)
+        assertEquals(0f, settings.backgroundAlpha)
+    }
+
+    private fun <T : Any> assertKey(
+        key: PreferenceKey<T>,
+        expectedName: String,
+        expectedType: PreferenceType<T>,
+        expectedDefault: T,
+    ) {
+        assertEquals(expectedName, key.name)
+        assertEquals(expectedType, key.type)
+        assertEquals(expectedDefault, key.defaultValue)
     }
 
     private class FailingReadStore : PreferenceStore {
