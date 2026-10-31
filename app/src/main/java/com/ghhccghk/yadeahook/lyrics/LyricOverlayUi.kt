@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -27,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,10 +52,19 @@ import kotlinx.coroutines.isActive
 fun LyricOverlay(
     data: SuperLyricData?,
     source: MusicSource?,
-    refreshToken: Long
+    refreshToken: Long,
+    isDarkTheme: Boolean
 ) {
     val karaokeLine = remember(data, refreshToken) { data?.toKaraokeLine() }
     val syncedLine = remember(data, refreshToken) { data?.toSyncedLine() }
+    val primaryColor = if (isDarkTheme) Color.White else Color(0xFF121212)
+    val lyricTextStyle = remember(primaryColor) {
+        LyricTextStyle.copy(color = primaryColor)
+    }
+    val translationTextStyle = remember(primaryColor) {
+        TranslationTextStyle.copy(color = primaryColor.copy(alpha = 0.68f))
+    }
+    val textMeasurer = rememberTextMeasurer()
 
     Box(
         modifier = Modifier
@@ -63,7 +74,7 @@ fun LyricOverlay(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 300.dp, top = 48.dp, end = 24.dp, bottom = 5.dp)
+                .padding(start = 300.dp, top = 42.dp, end = 30.dp, bottom = 5.dp)
         ) {
             if (source != null) {
                 Row(
@@ -85,7 +96,7 @@ fun LyricOverlay(
                     }
                     Text(
                         text = source.appName,
-                        color = Color.White.copy(alpha = 0.82f),
+                        color = primaryColor.copy(alpha = 0.82f),
                         fontSize = 12.sp,
                         lineHeight = 14.sp,
                         fontWeight = FontWeight.Medium,
@@ -102,29 +113,34 @@ fun LyricOverlay(
                     line = karaokeLine,
                     refreshToken = refreshToken
                 )
-                CompositionLocalProvider(LocalTextStyle provides TranslationTextStyle) {
-                    KaraokeLineText(
-                        line = karaokeLine,
-                        currentTimeProvider = { playbackPosition },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 1.dp),
-                        normalLineTextStyle = LyricTextStyle,
-                        accompanimentLineTextStyle = LyricTextStyle,
-                        phoneticTextStyle = TranslationTextStyle,
-                        activeColor = Color.White,
-                        showTranslation = true,
-                        showPhonetic = false
-                    )
+                CompositionLocalProvider(LocalTextStyle provides translationTextStyle) {
+                    // KaraokeLineText 只在绘制回调里读取时间，自身没有进度 State。
+                    // 以时间锚点击穿组合缓存，确保每次进度变化都会重新绘制。
+                    key(playbackPosition, refreshToken) {
+                        KaraokeLineText(
+                            line = karaokeLine,
+                            currentTimeProvider = { playbackPosition },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 1.dp),
+                            normalLineTextStyle = lyricTextStyle,
+                            accompanimentLineTextStyle = lyricTextStyle,
+                            phoneticTextStyle = translationTextStyle,
+                            activeColor = primaryColor,
+                            showTranslation = true,
+                            showPhonetic = false,
+                            textMeasurer = textMeasurer
+                        )
+                    }
                 }
             } else if (syncedLine != null) {
                 // 没有逐字时间时使用库的普通同步行布局。
-                CompositionLocalProvider(LocalTextStyle provides TranslationTextStyle) {
+                CompositionLocalProvider(LocalTextStyle provides translationTextStyle) {
                     SyncedLineText(
                         line = syncedLine,
                         isLineRtl = false,
-                        textStyle = LyricTextStyle,
-                        textColor = Color.White,
+                        textStyle = lyricTextStyle,
+                        textColor = primaryColor,
                         modifier = Modifier.padding(top = 1.dp),
                         showTranslation = true
                     )
@@ -132,7 +148,7 @@ fun LyricOverlay(
             } else {
                 Text(
                     text = "暂无歌词",
-                    color = Color.White.copy(alpha = 0.7f),
+                    color = primaryColor.copy(alpha = 0.7f),
                     fontSize = 12.sp,
                     lineHeight = 15.sp,
                     maxLines = 1
@@ -143,14 +159,12 @@ fun LyricOverlay(
 }
 
 private val LyricTextStyle = TextStyle(
-    color = Color.White,
     fontSize = 15.sp,
     lineHeight = 20.sp,
     fontWeight = FontWeight.Bold
 )
 
 private val TranslationTextStyle = TextStyle(
-    color = Color.White.copy(alpha = 0.68f),
     fontSize = 11.sp,
     lineHeight = 13.sp
 )

@@ -3,6 +3,7 @@ package com.ghhccghk.yadeahook.lyrics
 import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.Build
@@ -46,6 +47,7 @@ object LyricOverlayController {
     private val lyricState = mutableStateOf<SuperLyricData?>(null)
     private val lyricRefreshToken = mutableStateOf(0L)
     private val musicSourceState = mutableStateOf<MusicSource?>(null)
+    private val darkThemeState = mutableStateOf(false)
     private val musicSourceCache = mutableMapOf<String, MusicSource>()
 
     private var appContext: Context? = null
@@ -74,6 +76,7 @@ object LyricOverlayController {
         ensureReceiver()
         Log.d(TAG, "attach: ${activity.javaClass.name}")
 
+        syncOverlayTheme(activity)
         if (activityRef?.get() === activity && composeView != null) {
             return
         }
@@ -99,7 +102,8 @@ object LyricOverlayController {
                         LyricOverlay(
                             data = lyricState.value,
                             source = musicSourceState.value,
-                            refreshToken = lyricRefreshToken.value
+                            refreshToken = lyricRefreshToken.value,
+                            isDarkTheme = darkThemeState.value
                         )
                     }
                 }
@@ -168,6 +172,9 @@ object LyricOverlayController {
             return
         }
 
+        // 原 App 的夜间模式由 AppCompat 手动切换，以导航 Activity 的实际配置为准。
+        syncOverlayTheme(activityRef?.get())
+
         if (!firstDrawLogged) {
             firstDrawLogged = true
             Log.d(
@@ -215,6 +222,16 @@ object LyricOverlayController {
         }
 
         view.draw(canvas)
+    }
+
+    private fun syncOverlayTheme(activity: Activity?) {
+        val isDark = activity?.resources?.configuration?.let { configuration ->
+            (configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+                Configuration.UI_MODE_NIGHT_YES
+        } ?: false
+        if (darkThemeState.value != isDark) {
+            darkThemeState.value = isDark
+        }
     }
 
     private fun ensureReceiver() {
