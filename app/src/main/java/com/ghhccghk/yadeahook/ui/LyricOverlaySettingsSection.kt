@@ -7,10 +7,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -22,8 +24,10 @@ import io.github.lingqiqi5211.meowui.core.MeowUiStyle
 import io.github.lingqiqi5211.meowui.core.preference.PreferenceConnectionState
 import io.github.lingqiqi5211.meowui.core.preference.PreferenceWriteResult
 import io.github.lingqiqi5211.meowui.preference.rememberMeowPreferenceConnectionState
+import io.github.lingqiqi5211.meowui.preference.currentMeowPreferenceStore
 import io.github.lingqiqi5211.meowui.theme.MeowTheme
 import io.github.lingqiqi5211.meowui.xposed.MeowXposedPreferenceHost
+import kotlinx.coroutines.launch
 
 private sealed interface OverlayWriteStatus {
     data object Idle : OverlayWriteStatus
@@ -54,6 +58,8 @@ fun LyricOverlaySettingsSection(modifier: Modifier = Modifier) {
         },
     ) {
         val connectionState by rememberMeowPreferenceConnectionState()
+        val store = currentMeowPreferenceStore()
+        val scope = rememberCoroutineScope()
 
         MeowTheme(
             style = MeowUiStyle.MaterialExpressive,
@@ -150,6 +156,97 @@ fun LyricOverlaySettingsSection(modifier: Modifier = Modifier) {
                         valueRange = OverlaySettingSpecs.frameRate.range,
                         valueText = ::formatFrameRate,
                     )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            var allSaved = true
+                            fun report(result: PreferenceWriteResult) {
+                                if (result !is PreferenceWriteResult.Success) {
+                                    allSaved = false
+                                }
+                            }
+
+                            report(
+                                store.write(
+                                    YadeaSettingsKeys.overlayEnabled,
+                                    OverlaySettingSpecs.enabled.defaultValue,
+                                )
+                            )
+                            report(
+                                store.write(
+                                    YadeaSettingsKeys.overlayShowSource,
+                                    OverlaySettingSpecs.showSource.defaultValue,
+                                )
+                            )
+                            report(
+                                store.write(
+                                    YadeaSettingsKeys.overlayShowTranslation,
+                                    OverlaySettingSpecs.showTranslation.defaultValue,
+                                )
+                            )
+                            report(
+                                store.write(
+                                    YadeaSettingsKeys.overlayDensity,
+                                    OverlaySettingSpecs.density.defaultValue,
+                                )
+                            )
+                            report(
+                                store.write(
+                                    YadeaSettingsKeys.overlayFontScale,
+                                    OverlaySettingSpecs.fontScale.defaultValue,
+                                )
+                            )
+                            report(
+                                store.write(
+                                    YadeaSettingsKeys.overlayTop,
+                                    OverlaySettingSpecs.top.defaultValue,
+                                )
+                            )
+                            report(
+                                store.write(
+                                    YadeaSettingsKeys.overlayStart,
+                                    OverlaySettingSpecs.start.defaultValue,
+                                )
+                            )
+                            report(
+                                store.write(
+                                    YadeaSettingsKeys.overlayEnd,
+                                    OverlaySettingSpecs.end.defaultValue,
+                                )
+                            )
+                            report(
+                                store.write(
+                                    YadeaSettingsKeys.overlayBackgroundAlpha,
+                                    OverlaySettingSpecs.backgroundAlpha.defaultValue,
+                                )
+                            )
+                            report(
+                                store.write(
+                                    YadeaSettingsKeys.overlayWidthRatio,
+                                    OverlaySettingSpecs.widthRatio.defaultValue,
+                                )
+                            )
+                            report(
+                                store.write(
+                                    YadeaSettingsKeys.overlayFrameRate,
+                                    OverlaySettingSpecs.frameRate.defaultValue,
+                                )
+                            )
+
+                            writeStatus = if (allSaved) {
+                                OverlayWriteStatus.Saved
+                            } else {
+                                OverlayWriteStatus.Failed("部分设置恢复失败，请重试")
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("恢复歌词设置默认值")
                 }
             }
         }
