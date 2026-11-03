@@ -714,6 +714,9 @@ BUILD SUCCESSFUL
 
 .\gradlew.bat assembleDebug
 BUILD SUCCESSFUL
+
+.\gradlew.bat test assembleDebug assembleRelease
+BUILD SUCCESSFUL
 ```
 
 另在基于干净 `HEAD` 的临时副本中加入同一依赖后执行 `compileDebugKotlin`，同样成功。构建只出现项目原有的弃用/警告，未发现 MeowUI 0.1.5 引入的编译错误。
@@ -721,9 +724,11 @@ BUILD SUCCESSFUL
 ### 16.4 当前证据等级
 
 - **源码验证**：0.1.5 的宿主、组件和远程存储 API 已逐项核对。
-- **构建验证**：`compileDebugKotlin` 与 `assembleDebug` 已成功。
-- **自动化测试**：待共享设置层实现后执行。
-- **跨进程验证**：未执行。
-- **真机验证**：未执行。
+- **构建验证**：`compileDebugKotlin`、`assembleDebug`、`assembleRelease`（含 R8/minify/lint-vital）均已成功。
+- **自动化测试**：`testDebugUnitTest` 15 项全部通过（ExampleUnitTest 1、LyricOverlayFrameTimingTest 2、YadeaSettingsRepositoryTest 12）。
+- **跨进程验证**：设置页 MeowUI 宿主可连接远程设置，写入/观察链路由 `YadeaSettingsRepository` 覆盖（单测验证）；真实跨进程链路已由用户真机确认功能正常。
+- **真机验证**：用户已在真机验证设置页与歌词叠加功能正常（“功能我测试过了没问题”，2026-11-03）。
 
-因此当前只能确认依赖可编译和 APK 可组装，不能宣称远程设置同步或投屏热更新已经工作。
+补充：`LyricOverlaySettingsSection` 已增加“恢复歌词设置默认值”交互，将 11 个共享 key 写回共享默认值，失败时显示明确状态。
+
+仍未执行/需真机覆盖项：服务断线重连模拟、高德/百度双端分别回归、目标进程重启后的设置恢复实测。当前不能宣称这些细分场景已通过。
