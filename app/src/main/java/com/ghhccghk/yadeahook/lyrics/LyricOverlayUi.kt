@@ -98,31 +98,54 @@ fun LyricOverlay(
             if (settings.showSource && source != null) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val icon = source.icon
-                    if (icon != null) {
-                        Image(
-                            bitmap = icon,
-                            contentDescription = null,
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier
-                                .size(20.dp)
-                                .clip(CircleShape)
-                        )
-                        Spacer(modifier = Modifier.width(5.dp))
-                    }
+                    // 左侧：歌曲信息
                     Text(
-                        text = source.appName,
+                        text = (data?.title ?: "") + " " +
+                                (data?.artist ?: "") + " " +
+                                (data?.album ?: ""),
                         color = primaryColor.copy(alpha = 0.82f),
                         fontSize = 12.sp,
                         lineHeight = 14.sp,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.widthIn(max = 180.dp)
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp)
                     )
+
+                    // 右侧：应用来源
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        val icon = source.icon
+                        if (icon != null) {
+                            Image(
+                                bitmap = icon,
+                                contentDescription = null,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .clip(CircleShape)
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                        }
+
+                        Text(
+                            text = source.appName,
+                            color = primaryColor.copy(alpha = 0.82f),
+                            fontSize = 12.sp,
+                            lineHeight = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 180.dp)
+                        )
+                    }
                 }
             }
 
