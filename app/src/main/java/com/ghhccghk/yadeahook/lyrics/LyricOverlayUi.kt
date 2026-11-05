@@ -103,12 +103,11 @@ fun LyricOverlay(
                 ) {
                     // 左侧：歌曲信息
                     Text(
-                        text = (data?.title ?: "") + " " +
-                                (data?.artist ?: "") + " " +
-                                (data?.album ?: ""),
+                        text = (data?.title ?: "") + "-" +
+                                (data?.artist ?: ""),
                         color = primaryColor.copy(alpha = 0.82f),
-                        fontSize = 12.sp,
-                        lineHeight = 14.sp,
+                        fontSize = 10.sp,
+                        lineHeight = 12.sp,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
